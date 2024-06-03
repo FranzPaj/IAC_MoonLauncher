@@ -1,0 +1,9 @@
+# Cache
+\__pycache__
+
+# Data files
+*.pyc
+*.iml
+*.xml
+# Dat files with outcomes may be useful for indipendent post-processing
+# *.dat
