@@ -26,6 +26,15 @@ gravitational_param_dict = {
     'Earth' : mu_earth,
     'Moon' : mu_moon,
 }
+# Average radius
+R_sun = spice.get_average_radius('Sun')
+R_moon = spice.get_average_radius('Moon')
+R_earth = spice.get_average_radius('Earth')
+average_radius_dict = {
+    'Sun' : R_sun,
+    'Earth' : R_earth,
+    'Moon' : R_moon,
+}
 
 # Approximate orbit semi-major axes at t = 0 (J2000)
 # Moon around Earth
@@ -85,15 +94,28 @@ class Orbit:
         # Define nominal velocity at periapsis
         velocity_at_periapsis = np.sqrt(self.mu * (2 / self.rp - 1 / self.sma))
         # Required velocity at periapsis for escape
-        required_velocity_at_periapsis = self.get_velocity_for_escape(self, escape_velocity)
+        required_velocity_at_periapsis = self.get_velocity_for_escape(escape_velocity)
         # Needed DeltaV
         deltav = required_velocity_at_periapsis - velocity_at_periapsis
 
         return deltav
 
 
-
+###########################################################################
+# CUSTOM FUNCTIONS ########################################################
+###########################################################################
     
+def get_sma_from_altitude(orbited_body : str,
+                          altitude : float):
+    '''
+    Description TBD
+    '''
+
+    average_radius = average_radius_dict[orbited_body]  # Get average radius of orbited body
+    sma = average_radius + altitude  # Get semi-major axis of equivalent circular orbit
+
+    return sma
+
 
         
 
