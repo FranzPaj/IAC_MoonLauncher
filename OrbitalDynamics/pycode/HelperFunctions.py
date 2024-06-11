@@ -56,28 +56,32 @@ class Orbit:
     DESCRIPTIONM TBD
     '''
     def __init__(self,
-                 orbited_body : str,
-                 sma : float,
-                 ecc : float = 0,
-                 incl : float = np.pi / 2,
-                 omega : float = 0,
-                 raan : float = 0,
-                 theta : float = 0):
+                 orbited_body: str,
+                 semi_major_axis: float,
+                 eccentricity: float = 0,
+                 inclination: float = np.pi / 2,
+                 omega: float = 0,  # Longitude of the ascenscending node
+                 raan: float = 0,   # Right ascension of the ascending node
+                 theta: float = 0):
         
         # Attribute Keplerian orbital parameters
         self.orbited_body = orbited_body
-        self.sma = sma
-        self.ecc = ecc
-        self.incl = incl
+        self.sma = semi_major_axis
+        self.ecc = eccentricity
+        self.incl = inclination
         self.omega = omega
         self.raan = raan
         self.theta = theta
 
         # Attribute relevant physical environment parameters
         self.mu = gravitational_param_dict[self.orbited_body]
+        self.R = average_radius_dict[self.orbited_body]
 
         # Useful orbit variables
-        self.rp = self.sma * (1 - self.ecc)  # Get radius of periapsis for ideal impulsive thrust
+        self.rp = self.sma * (1 - self.ecc)  # Periapsis radius
+        self.ra = self.sma * (1 + self.ecc)  # Apoapsis radius
+        self.vp = np.sqrt(self.mu * (2 / self.rp - 1 / self.sma))  # Velocity at periapsis
+        self.va = np.sqrt(self.mu * (2 / self.ra - 1 / self.sma))  # Velocity at apoapsis
 
     def get_velocity_for_escape(self, escape_velocity : float = 0):
         '''
