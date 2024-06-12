@@ -1,6 +1,7 @@
 from pycode.HelperFunctions import Orbit, average_radius_dict, gravitational_param_dict
 from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
+from functools import partial
 import numpy as np
 
 
@@ -52,6 +53,19 @@ class LaunchTrajectory(Orbit):
         V0 = fsolve(initial_velocity, self.V0, args=(self.launch_angle, h))[0]
         return V0
 
+    def get_initial_launch_angle_for_altitude(self, h: float = 100e3):
+        """
+        Calculate initial launch angle to reach an altitude h with a particular initial velocity at the Moon
+        :param h: float --> altitude of the target orbit.
+        :return: float --> launch angle.
+        """
+        initial_gamma = partial(initial_launch_angle, V0=self.V0, h0=h)
+        angle, _, flag, _ = fsolve(initial_gamma, np.radians(45), full_output=True)
+        if flag == 1:
+            return angle[0]
+        else:
+            raise ValueError('No solution found for the initial launch angle, try a different initial speed')
+
     # TODO: Implement interation and optimization for energy and delta-v calculations
     # TODO: Design and implement gravity turn
 
@@ -73,6 +87,9 @@ def initial_velocity(V0: float, gamma: float = 0, h: float = 100e3):
     return ra - ra_target
 
 
+def initial_launch_angle(gamma: float, V0: float = 1754, h0: float = 100e3):
+    return initial_velocity(V0, gamma, h0)
+
 
 if __name__ == '__main__':
 
@@ -90,11 +107,10 @@ if __name__ == '__main__':
     # plt.show()
 
     # Test the LaunchTrajectory class
-    initial_V = V0[0]
-    launch_angle = np.radians(0)
-    trajectory = LaunchTrajectory('Moon', initial_V, launch_angle)
+    initial_V = V0[30]
+    launch_angle = np.radians(45)
+    trajectory = LaunchTrajectory('Moon', 100, launch_angle)
 
     print('Maximum altitude = ', trajectory.get_max_altitude() / 1e3, ' km')
-    print('Delta_V for circularization = ', trajectory.get_deltav_for_circularization() / 1e3, ' km/s')
-    print('Necessary velocity to reach 150km = ', trajectory.get_initial_velocity_for_altitude(150e3) / 1e3, ' km')
+    print('Initial angle for 100 km = ', np.degrees(trajectory.get_initial_launch_angle_for_altitude(100e3)))
 
