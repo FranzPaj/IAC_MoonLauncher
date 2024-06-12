@@ -50,7 +50,7 @@ sma_earth = keplerian_state_earth[0]
 ###########################################################################
 # CUSTOM CLASSES ##########################################################
 ###########################################################################
-
+# TODO: Document classes and methods
 class Orbit:
     '''
     DESCRIPTIONM TBD
@@ -104,11 +104,19 @@ class Orbit:
 
         return deltav
 
+    def get_deltav_for_circularization(self):
+        """
+        Function for calculating the delta-v required to circularize at apogee
+        """
+        vc = np.sqrt(self.mu / self.ra)
+        return vc - self.va
+
 
 ###########################################################################
 # CUSTOM FUNCTIONS ########################################################
 ###########################################################################
-    
+
+# TODO: Do we need this function?
 def get_sma_from_altitude(orbited_body : str,
                           altitude : float):
     '''
