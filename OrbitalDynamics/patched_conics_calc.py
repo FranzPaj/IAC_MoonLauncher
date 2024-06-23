@@ -16,7 +16,7 @@ from pycode.HelperFunctions import sma_moon, mu_moon
 
 # Comparison between the DeltaV needed to escape Earth's SoI from a Moon  and from 
 # an Earth parking orbit. 
-# NOTE Class and structure is definitely still WIP, gimme a second to work on in Javi
+# NOTE Class and structure is definitely still WIP
 
 # Define problem parameters
 parking_orbit_altitude_earth = 300 * 10 ** 3  # m
