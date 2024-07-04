@@ -75,7 +75,7 @@ if __name__ == '__main__':
 
     # Define thrust and guidance settings
     rotation_model_settings = environment_setup.rotation_model.orbital_state_direction_based(
-        central_body="Earth",
+        central_body="Moon",
         is_colinear_with_velocity=True,
         direction_is_opposite_to_vector=False,
         base_frame="",
@@ -90,7 +90,7 @@ if __name__ == '__main__':
 
     # Propagation setup
     bodies_to_propagate = ["Vehicle"]
-    central_bodies = ["Earth"]
+    central_bodies = ["Moon"]
 
     # Acceleration model
     acceleration_on_vehicle = dict(
@@ -116,21 +116,24 @@ if __name__ == '__main__':
     # v_sat = -2560 * moon_state[3:] / np.linalg.norm(moon_state[3:]) + moon_state[3:]
     v_sat = -transfer_orbit.va * moon_state[3:] / np.linalg.norm(moon_state[3:])
 
-    system_initial_state = np.array([satellite_original_position[0],
-                                     satellite_original_position[1],
-                                     satellite_original_position[2],
-                                     v_sat[0],
-                                     v_sat[1],
-                                     v_sat[2]])
+    # system_initial_state = np.array([satellite_original_position[0],
+    #                                  satellite_original_position[1],
+    #                                  satellite_original_position[2],
+    #                                  v_sat[0],
+    #                                  v_sat[1],
+    #                                  v_sat[2]])
+
+    system_initial_state = np.array([R0 + h_origin, 0.0, 0.0, 0.0, -v0 - 720, 0.0])
 
     # Create dependent variables
+    # vehicle_altitude_dep_var = propagation_setup.dependent_variable.altitude("Vehicle", "Earth")
     vehicle_altitude_dep_var = propagation_setup.dependent_variable.altitude("Vehicle", "Earth")
     dependent_variables_to_save = [vehicle_altitude_dep_var]
 
     # Create termination settings
     termination_distance_settings = propagation_setup.propagator.dependent_variable_termination(
         dependent_variable_settings=vehicle_altitude_dep_var,
-        limit_value=300e3,
+        limit_value=average_radius_dict['Earth']+h_target,
         use_as_lower_limit=True)
 
     termination_time_settings = propagation_setup.propagator.time_termination(simulation_end_epoch)
@@ -165,13 +168,6 @@ if __name__ == '__main__':
         output_variables=[vehicle_altitude_dep_var]
     )
 
-    mass_rate_settings = dict(Vehicle=[propagation_setup.mass_rate.from_thrust()])
-    mass_rate_models = propagation_setup.create_mass_rate_models(
-        system_of_bodies,
-        mass_rate_settings,
-        acceleration_models
-    )
-
     propagator_settings = propagation_setup.propagator.multitype(
         [translational_propagator_settings],
         integrator_settings,
@@ -192,28 +188,35 @@ if __name__ == '__main__':
 
 
     # Get the Moon state
-    moon_states_from_spice = {
-        epoch: spice.get_body_cartesian_state_at_epoch("Moon", "Earth", "J2000", "None", epoch)
+    # moon_states_from_spice = {
+    #     epoch: spice.get_body_cartesian_state_at_epoch("Moon", "Earth", "J2000", "None", epoch)
+    #     for epoch in list(state_history.keys())
+    # }
+
+    earth_states_from_spice = {
+        epoch: spice.get_body_cartesian_state_at_epoch("Earth", "Moon", "J2000", "None", epoch)
         for epoch in list(state_history.keys())
     }
 
-    moon_array = result2array(moon_states_from_spice)
+    earth_array = result2array(earth_states_from_spice)
+
+    # moon_array = result2array(moon_states_from_spice)
 
     # Plot stuff
     time_days = (vehicle_array[:, 0] - vehicle_array[0, 0]) / constants.JULIAN_DAY
 
     # Height vs days
-    # fig1 = plt.figure(figsize=(9, 5))
-    # ax1 = fig1.add_subplot(111)
-    # ax1.set_title(f"Vehicle altitude above Earth")
-    #
-    # ax1.plot(time_days, dep_var_array[:, 1] / 1e3)
-    # ax1.set_xlabel("Simulation time [day]")
-    # ax1.set_ylabel("Vehicle altitude [km]")
-    # ax1.grid()
-    #
-    # fig1.tight_layout()
-    # fig1.show()
+    fig1 = plt.figure(figsize=(9, 5))
+    ax1 = fig1.add_subplot(111)
+    ax1.set_title(f"Vehicle altitude above Earth")
+
+    ax1.plot(time_days, dep_var_array[:, 1] / 1e3)
+    ax1.set_xlabel("Simulation time [day]")
+    ax1.set_ylabel("Vehicle altitude [km]")
+    ax1.grid()
+
+    fig1.tight_layout()
+    fig1.show()
 
     # Trajectory
     fig3 = plt.figure(figsize=(8, 8))
@@ -222,11 +225,13 @@ if __name__ == '__main__':
 
     ax3.plot(vehicle_array[:, 1], vehicle_array[:, 2], vehicle_array[:, 3], label="Vehicle", linestyle="-",
              color="green")
-    ax3.plot(moon_array[:, 1], moon_array[:, 2], moon_array[:, 3], label="Moon", linestyle="-", color="grey")
-    ax3.scatter(0.0, 0.0, 0.0, label="Earth", marker="o", color="blue")
+    # ax3.plot(moon_array[:, 1], moon_array[:, 2], moon_array[:, 3], label="Moon", linestyle="-", color="grey")
+    ax3.plot(earth_array[:, 1], earth_array[:, 2], earth_array[:, 3], label="Earth", linestyle="-", color="grey")
+    ax3.scatter(0.0, 0.0, 0.0, label="Moon", marker="o", color="blue")
 
     ax3.legend()
-    ax3.set_xlim([-3E8, 3E8]), ax3.set_ylim([-3E8, 3E8]), ax3.set_zlim([-3E8, 3E8])
+    # ax3.set_xlim([-3E8, 3E8]), ax3.set_ylim([-3E8, 3E8]), ax3.set_zlim([-3E8, 3E8])
+    ax3.set_xlim([-4E8, 4E8]), ax3.set_ylim([-4E8, 4E8]), ax3.set_zlim([-4E8, 4E8])
     ax3.set_xlabel("x [m]"), ax3.set_ylabel("y [m]"), ax3.set_zlabel("z [m]")
 
     fig3.tight_layout()
