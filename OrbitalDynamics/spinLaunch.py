@@ -74,6 +74,7 @@ class SpinLaunch:
 
 
 def optimize_initial_params(thrust_load: float = None):
+    # TODO: Sensitivity analysis
     g = 1.625
     v_target = np.sqrt(gravitational_param_dict['Moon'] / average_radius_dict['Moon'] + 1e5)
 
@@ -209,10 +210,22 @@ if __name__ == '__main__':
     # # print('Delta-V to circularize = ', deltaV)
     # # print('Propellant mass needed = ', launch.thruster.mass * (1 - np.exp(-deltaV / (9.81 * launch.thruster.Isp))))
 
+    gamma = np.radians(np.arange(0, 90, 5))
+    v0 = np.linspace(0, 1000, len(gamma))
+
     prop_mass = optimize_initial_params()
 
     plt.imshow(prop_mass)
-    plt.colorbar()
+
+    cbar = plt.colorbar()
+    cbar.set_label('Propellant mass consumed [kg]')
+
+    plt.xticks(ticks=np.arange(0, len(v0[1:]), 2), labels=np.array(np.round(v0[1::2]), dtype=int))
+    plt.yticks(ticks=np.arange(0, len(gamma[1:]), 5), labels=np.array(np.round(np.degrees(gamma[1::5])), dtype=int))
+
     plt.xlabel('Initial velocity [m/s]')
     plt.ylabel('Launch angle')
+    plt.title('Propellant mass consumed for a 1000kg rocket with Isp = 300s')
+
     plt.show()
+
