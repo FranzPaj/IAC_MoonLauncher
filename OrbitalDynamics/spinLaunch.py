@@ -62,8 +62,6 @@ class SpinLaunch:
             mass.append(self.thruster.mass)
             thrust_history.append(thrust)
 
-
-
         return pos, np.array(velocity), np.array(angle), np.array(time), np.array(mass), np.array(thrust_history)
 
     def plot_launch(self, pos):
@@ -100,7 +98,7 @@ def launch(angle, v0,
         pos = np.array([0, 0])
 
         # Start simulation
-        while gamma > 0:
+        while gamma >= 0:
             # Calculate thrust
             if mp <= 0:
                 thrust = 0
@@ -161,43 +159,53 @@ def launch(angle, v0,
     deltaV = np.sqrt(v ** 2 + v_target ** 2 - 2 * v * v_target * np.cos(gamma))
     dm = total_mass * (1 - np.exp(-deltaV / (Isp * 9.81)))
 
-    # Return propellant mass fraction
-    return (1 - construction) * prop_mass_ratio + dm / mass
+    # Return useful mass fraction - 1 - (propellant mass fraction) - construction mass fraction
+    return 1 - ((1 - construction) * prop_mass_ratio - dm / mass) - construction
 
 
 def optimize_initial_params():
     # Define optimization parameters
     gamma = np.radians(np.arange(0, 90, 5))
-    v0 = np.linspace(0, 1000, len(gamma))
+    v0 = np.arange(100, 1000, 50)
 
     # Initialize arrays to save solution
-    prop_mass_fraction = np.zeros((len(gamma) - 1, len(v0) - 1))
+    useful_mass_fraction = np.zeros((len(gamma), len(v0)))
 
     # Start simulation
-    for i, angle in tqdm(enumerate(gamma[1:])):
-        for j, vel in enumerate(v0[1:]):
-            prop_mass_fraction[i, j] = launch(angle, vel)
+    for i in tqdm(range(len(gamma))):
+        angle = gamma[i]
+        for j, vel in enumerate(v0):
+            useful_mass_fraction[i, j] = launch(angle, vel)
 
-    return prop_mass_fraction
+    return useful_mass_fraction
 
 
 if __name__ == '__main__':
     gamma = np.radians(np.arange(0, 90, 5))
-    v0 = np.linspace(0, 1000, len(gamma))
+    v0 = np.arange(100, 1000, 50)
 
-    prop_mass = optimize_initial_params()
+    useful_mass_fraction = optimize_initial_params()
 
-    plt.imshow(prop_mass)
+    for i, row in enumerate(useful_mass_fraction):
+        if np.isnan(row).all():
+            continue
+
+        velocity = np.where(row == np.nanmin(row))[0][0]
+
+        plt.scatter(v0[velocity], gamma[i], color='r')  # 'ro' plots a red dot
+
+    # Continue with the existing plotting code
+    plt.imshow(useful_mass_fraction)
 
     cbar = plt.colorbar()
-    cbar.set_label('Propellant mass consumed [kg]')
+    cbar.set_label('Useful mass fraction')
 
     plt.xticks(ticks=np.arange(0, len(v0[1:]), 2), labels=np.array(np.round(v0[1::2]), dtype=int))
     plt.yticks(ticks=np.arange(0, len(gamma[1:]), 5), labels=np.array(np.round(np.degrees(gamma[1::5])), dtype=int))
 
     plt.xlabel('Initial velocity [m/s]')
-    plt.ylabel('Launch angle')
-    plt.title('Propellant mass consumed for a 1000kg rocket with Isp = 300s')
+    plt.ylabel('Launch angle [degrees]')
+    plt.title('Mass = 1T, Isp = 300s, Mc/M = 0.1, Thrust = 1kN')
 
     plt.show()
 
