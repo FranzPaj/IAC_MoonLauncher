@@ -40,7 +40,7 @@ if __name__ == '__main__':
     transfer_orbit = Orbit('Earth', sma_transfer, e_transfer, inclination=0)
 
     # Calculate parameters at the border of the SOI
-    theta_SOI = np.arccos((transfer_orbit.p / transfer_orbit.sma - 1) / e_transfer)
+    theta_SOI = np.arccos((transfer_orbit.p / transfer_orbit.sma - 1) / e_transfer)  # Where the fuck did this ccome from??
     r_SOI = np.sqrt(sma_moon**2 + SOI_moon**2 - 2 * sma_moon * SOI_moon * np.cos(np.pi - theta_SOI))
     v_SOI = np.sqrt(2 * (muE / r_SOI - muE / (2 * sma_transfer)))
     gamma_SOI = np.arccos(transfer_orbit.h / (r_SOI * v_SOI))
