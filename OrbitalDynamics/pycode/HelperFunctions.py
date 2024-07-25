@@ -189,9 +189,6 @@ class LaunchTrajectory(Orbit):
         else:
             raise ValueError('No solution found for the initial launch angle, try a different initial speed')
 
-    # TODO: Implement interation and optimization for energy and delta-v calculations
-    # TODO: Design and implement gravity turn
-
 
 class Transfer:
     def __init__(self, parking_orbit: Orbit, target_orbit: Orbit, orbited_body_during_transfer: str = 'Sun',
@@ -300,7 +297,6 @@ class Transfer:
 ######### CUSTOM FUNCTIONS #############
 ########################################
 
-# TODO: Do we need this function?
 def get_sma_from_altitude(orbited_body: str,
                           altitude: float):
     '''
