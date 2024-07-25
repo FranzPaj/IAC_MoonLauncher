@@ -12,7 +12,6 @@ from tudatpy.util import result2array
 from tudatpy.astro.time_conversion import DateTime
 
 
-
 if __name__ == '__main__':
     # Earth Moon 2D transfer
     # TODO: Implement polar transfer
