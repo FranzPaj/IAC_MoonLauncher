@@ -78,8 +78,8 @@ def launch(angle, v0,
            mass: float = 1000,
            thrust: float = 1000):
 
-    g = 1.625
-    v_target = np.sqrt(gravitational_param_dict['Moon'] / (average_radius_dict['Moon'] + 1e5))
+    g = 1.625  # Gravity on the Moon
+    v_target = np.sqrt(gravitational_param_dict['Moon'] / (average_radius_dict['Moon'] + 1e5))  # Orbital velocity
 
     dt = 1e-2
     prop_mass_ratio = 1 / 10
@@ -128,10 +128,13 @@ def launch(angle, v0,
                 falling = True
                 break
 
-            if pos[-1, 1] > 1e5:
+            if pos[-1, 1] > 1e5:  # We are overshooting
                 break
 
         # Analyze exit conditions
+        if gamma <= np.radians(5) and pos[-1, 1] >= 1e5:  # Solution found
+            convergence = True
+
         if falling:
             if removed_mass:
                 # The solution lies between the previous and current mass fractions
@@ -144,38 +147,33 @@ def launch(angle, v0,
                     return np.nan
 
         else:
-            if gamma <= np.radians(5) and pos[-1, 1] >= 1e5:
-                convergence = True
-            else:
-                if pos[-1, 1] >= 1e5:
-                    # Rocket could have burnt less mass
-                    prop_mass_ratio -= 1 / 20
-                    removed_mass = True
-                    if prop_mass_ratio <= 0:
-                        prop_mass_ratio += 1 / 20
-                        convergence = True
-                else:
+            if pos[-1, 1] > 1e5:  # Overshoot
+                # Rocket could have burnt less mass
+                prop_mass_ratio -= 1 / 20
+                removed_mass = True
+                if prop_mass_ratio <= 0:
+                    # Solution lies between 0 and 1/20 propellant mass ratio
                     prop_mass_ratio += 1 / 20
-                    if removed_mass:
-                        # The solution lies between the previous and current mass fractions
-                        convergence = True
+                    convergence = True
+            else:  # Undershoot
+                prop_mass_ratio += 1 / 20
+                if removed_mass:
+                    # The solution lies between the previous and current mass fractions
+                    convergence = True
 
-    deltaV = np.sqrt(v ** 2 + v_target ** 2 - 2 * v * v_target * np.cos(gamma))
+    # Calculate final impulse for circularization
+    deltaV = np.sqrt(v ** 2 + v_target ** 2 - 2 * v * v_target * np.cos(gamma))  # From cosine law
     dm_manoeuvre = current_mass * (1 - np.exp(-deltaV / (Isp * 9.81)))  # Defined as > 0
 
-    # Gear ratio is the ratio between the total propellant at t0 and the propellant that can be delivered
-    mp_final = total_mass * (1 - construction) * (1 - prop_mass_ratio) - dm_manoeuvre  # Propellant available at the end of ascent
-    mp_initial = total_mass * (1 - construction)  # Propellant loaded at the beginning of ascent
+    ### Calculate gear ratio (ratio between the total propellant at t0 and the propellant that can be delivered) ###
+    mp_initial = total_mass * (1 - construction)
+    mp_final = total_mass * (1 - construction) * (1 - prop_mass_ratio) - dm_manoeuvre
     gr = mp_initial / mp_final  # Gear ratio
-    
-    # Old version
-    # Return useful mass fraction - 1 - (propellant mass fraction) - construction mass fraction
-    # return 1 - ((1 - construction) * prop_mass_ratio - dm / mass) - construction
 
     return gr
 
 
-def optimize_initial_params(gamma, v0):
+def optimize_initial_params(gamma: np.ndarray, v0: np.ndarray):
 
     # Initialize arrays to save solution
     useful_mass_fraction = np.zeros((len(gamma), len(v0)))
