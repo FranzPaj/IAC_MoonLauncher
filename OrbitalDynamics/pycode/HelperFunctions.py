@@ -191,6 +191,32 @@ class LaunchTrajectory(Orbit):
 
 
 class Transfer:
+    """
+        A class to represent the 2D transfer between two orbits around a celestial body.
+
+        Attributes
+        ----------
+        parking_orbit : Orbit
+            The initial orbit of the spacecraft.
+        target_orbit : Orbit
+            The target orbit the spacecraft aims to reach.
+        transfer_body : str
+            The body the spacecraft will orbit during the transfer.
+        r1 : float, optional
+            Initial distance from the orbited body during transfer (default is None).
+        r2 : float, optional
+            Final distance from the orbited body during transfer (default is None).
+
+        Methods
+        -------
+        get_transfer_delta_V():
+            Calculates the total delta-V required for the transfer.
+        _two_body_delta_V(full_output=False):
+            Calculates the delta-V for a transfer between two bodies.
+        _three_body_delta_V():
+            Calculates the delta-V for a transfer between two bodies around the Sun.
+    """
+
     def __init__(self, parking_orbit: Orbit, target_orbit: Orbit, orbited_body_during_transfer: str = 'Sun',
                  r1: float = None, r2: float = None):
         self.parking_orbit = parking_orbit
@@ -198,6 +224,7 @@ class Transfer:
         self.transfer_body = orbited_body_during_transfer
 
         if orbited_body_during_transfer != 'Sun':
+            # So far the class only supports planet to planet transfers, or planet to moon transfers (and vice-versa)
             if r1 is None or r2 is None:
                 raise ValueError(
                     'Please provide the initial (r1) and final (r2) distances for transfers not around the Sun')
@@ -239,58 +266,94 @@ class Transfer:
         """
         # TODO: V&V function
 
-        # Obtain relevant parameters
+        ################################## Obtain relevant parameters #################################################
+        # Gravitational parameter of the main orbited body
         mu0 = gravitational_param_dict[self.transfer_body]
+
+        # Velocity of the moon in question
         v_moon = np.sqrt(gravitational_param_dict[self.transfer_body] / self.transfer_orbit.ra)
+
+        # Radius of the Sphere of Influence (SoI) of the moon
         SOI_moon = self.transfer_orbit.ra * (gravitational_param_dict[self.parking_orbit.orbited_body] / mu0) ** (2 / 5)
+
+        # The distance from the main body to the border of the SoI along the transfer orbit
+        # This value follows from the fact that in an ellipse, the sum of the distances to the foci must be constant
         r_SOI = 2 * self.transfer_orbit.ecc * self.transfer_orbit.sma + 2 * self.transfer_orbit.rp - SOI_moon
 
-        # Calculate Earth-centred properties at the SOI border
-        v_SOI = np.sqrt(2 * mu0 / r_SOI - mu0 / self.transfer_orbit.rp + self.transfer_orbit.vp**2 / 2)
+        ####################### Calculate Earth-centred properties at the SOI border ###################################
+        # Planet-centred velocity at the SoI
+        v_SOI = np.sqrt(2 * mu0 / r_SOI - mu0 / self.transfer_orbit.rp + self.transfer_orbit.vp ** 2 / 2)
+
+        # Flight-path angle at the border of the SoI
         gamma_SOI = np.arccos(self.transfer_orbit.h / (r_SOI * v_SOI))
 
-        # Make coordinate frame change
+        ################################ Make coordinate frame change #################################################
+        # V_infinity is the velocity at the border of the SoI relative to the moon
         v_inf = v_SOI * np.array([[np.cos(gamma_SOI)], [np.sin(gamma_SOI)]]) - np.array([[0], [v_moon]])
-        v_inf = np.linalg.norm(v_inf)  # Moon-centred velocity
-        vp_moon = np.sqrt(2 * (gravitational_param_dict[self.target_orbit.orbited_body] / self.target_orbit.rp + v_inf**2 / 2))
+        v_inf = np.linalg.norm(v_inf)
 
-        # Calculate delta-V
+        # Velocity the spacecraft would have at the periapsis of the hyperbolic trajectory
+        vp_moon = np.sqrt(
+            2 * (gravitational_param_dict[self.target_orbit.orbited_body] / self.target_orbit.rp + v_inf ** 2 / 2))
+
+        ######################################### Calculate delta-V ##################################################
         Earth_impulse = np.abs(self.transfer_orbit.vp - self.parking_orbit.vp)
         Moon_impulse = vp_moon - self.target_orbit.vp
 
-        return Earth_impulse + Moon_impulse if not full_output else Earth_impulse + Moon_impulse, Earth_impulse, Moon_impulse
+        return (Earth_impulse + Moon_impulse if not full_output
+                else Earth_impulse + Moon_impulse, Earth_impulse, Moon_impulse)
 
-    def _three_body_delta_V(self):
+    def _three_body_delta_V(self, full_output: bool = False):
         """
         A first-order approximation of the delta-V for the transfer between 2 bodies round the Sun
         Assumptions:
             - The orbit is coplanar
             - Orbits are Keplerian within the sphere of influence of a body
             - Gamma is almost 0 at the border of the SOI of the planets
+            - SoI radius is negligible in comparison to the semi-major axis of the transfer orbit
+
+        :param full_output: bool --> flag to return the delta-V for each body separately
+        :return: float or tuple (3) --> delta-V for the transfer (and individual delta-Vs if full_output is True)
         """
 
         # TODO: V&V function
-        # Calculate the velocities of the planets
+
+        ############################### Calculate the velocities of the planets #######################################
         v_planet_arrival = np.sqrt(gravitational_param_dict[self.transfer_body] / self.target_orbit.ra)
         v_planet_departure = np.sqrt(gravitational_param_dict[self.transfer_body] / self.parking_orbit.ra)
 
-        # Arrival parameters
+        ######################################## Arrival parameters ###################################################
+        # Planet-centred arrival velocity
         v2 = self.transfer_orbit.va - v_planet_arrival
+
+        # Velocity at the border of the SOI for the arrival planet
         v_inf_2 = np.sqrt(v2 ** 2 - 2 * gravitational_param_dict[self.target_orbit.orbited_body] / self.target_orbit.rp)
 
-        delta_V = v2 - self.target_orbit.vp  # Impulse to circularize at arrival
+        # Impulse to circularize at arrival
+        arrival_impulse = v2 - self.target_orbit.vp
 
-        # Transfer parameters
+        ####################################### Transfer parameters ###################################################
+        # Star-centred velocity at the border of the arrival SoI
         v_SOI_2 = v_inf_2 + v_planet_arrival
+
+        # Star-centred velocity at the border of the departure SoI
+        # Assumes that the radius of the SoI is negligible compared to the semi-major axis of the transfer orbit
         v_SOI_1 = np.sqrt(2 * (v_SOI_2 ** 2 / 2 - gravitational_param_dict[self.transfer_body] * (
                 1 / self.transfer_orbit.rp - 1 / self.transfer_orbit.ra)))
 
-        # Arrival parameters
+        ####################################### Arrival parameters ####################################################
+        # Planet-centred velocity at SoI border (infinite distance)
         v_inf_1 = v_SOI_1 - v_planet_departure
+
+        # Periapsis velocity of the hyperbolic orbit
         v1 = np.sqrt(v_inf_1 + 2 * gravitational_param_dict[self.parking_orbit.orbited_body] / self.parking_orbit.rp)
 
-        delta_V += v1 - self.parking_orbit.vp  # Impulse to depart
-        return delta_V
+        # Impulse to enter said hyperbolic orbit
+        departure_impulse = v1 - self.parking_orbit.vp
+
+        ######################################### Calculate delta-V ##################################################
+        delta_V = arrival_impulse + departure_impulse
+        return delta_V if not full_output else delta_V, departure_impulse, arrival_impulse
 
 
 ########################################
