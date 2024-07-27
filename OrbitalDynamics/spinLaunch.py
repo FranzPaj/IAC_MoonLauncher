@@ -42,17 +42,17 @@ class SpinLaunch:
             if self.thruster.mp <= 0:
                 thrust = 0
 
-            dV = thrust - g * np.sin(gamma)
-            dG = 1 / v * -g * np.cos(gamma)
+            dVdt = thrust/self.thruster.mass - g * np.sin(gamma)  # dV/dt
+            dGdt = 1 / v * -g * np.cos(gamma)  # d(gamma)/dt
 
             # Update the state
-            gamma += dG * dt
-            v += dV * dt
+            gamma += dGdt * dt
+            v += dVdt * dt
             t += dt
 
             # Update the mass
             if self.thruster.mp > 0:
-                self.thruster.impulse(dV*dt)
+                self.thruster.impulse(dVdt*dt)
 
             # Store values
             pos = np.vstack((pos, pos[-1] + v * dt * np.array([np.cos(gamma), np.sin(gamma)])))
@@ -79,7 +79,7 @@ def launch(angle, v0,
            thrust: float = 1000):
 
     g = 1.625
-    v_target = np.sqrt(gravitational_param_dict['Moon'] / average_radius_dict['Moon'] + 1e5)
+    v_target = np.sqrt(gravitational_param_dict['Moon'] / (average_radius_dict['Moon'] + 1e5))
 
     dt = 1e-2
     prop_mass_ratio = 1 / 10
@@ -91,6 +91,7 @@ def launch(angle, v0,
     while not convergence:
         total_mass = mass
         mp = total_mass * (1 - construction) * prop_mass_ratio  # Propellant to be burnt during ascent
+        dry_mass = total_mass - mp
 
         t = 0
         v = v0
@@ -99,22 +100,25 @@ def launch(angle, v0,
 
         # Start simulation
         while gamma >= 0:
+
+            current_mass = dry_mass + mp
+
             # Calculate thrust
             if mp <= 0:
                 thrust = 0
 
             # EOM
-            dV = thrust - g * np.sin(gamma)
-            dG = 1 / v * -g * np.cos(gamma)
+            dVdt = thrust / current_mass - g * np.sin(gamma)
+            dGdt = 1 / v * (-g) * np.cos(gamma)
 
             # Update the state
-            gamma += dG * dt
-            v += dV * dt
+            gamma += dGdt * dt
+            v += dVdt * dt
             t += dt
 
             # Update mass
-            dm = total_mass * (1 - np.exp(-dV * dt / (Isp * 9.81)))
-            total_mass -= dm
+            dm = current_mass * (1 - np.exp(-dVdt * dt / (Isp * 9.81)))
+            current_mass -= dm
             mp -= dm
 
             # Store position values and check end conditions
@@ -157,16 +161,21 @@ def launch(angle, v0,
                         convergence = True
 
     deltaV = np.sqrt(v ** 2 + v_target ** 2 - 2 * v * v_target * np.cos(gamma))
-    dm = total_mass * (1 - np.exp(-deltaV / (Isp * 9.81)))
+    dm_manoeuvre = current_mass * (1 - np.exp(-deltaV / (Isp * 9.81)))  # Defined as > 0
 
+    # Gear ratio is the ratio between the total propellant at t0 and the propellant that can be delivered
+    mp_final = total_mass * (1 - construction) * (1 - prop_mass_ratio) - dm_manoeuvre  # Propellant available at the end of ascent
+    mp_initial = total_mass * (1 - construction)  # Propellant loaded at the beginning of ascent
+    gr = mp_initial / mp_final  # Gear ratio
+    
+    # Old version
     # Return useful mass fraction - 1 - (propellant mass fraction) - construction mass fraction
-    return 1 - ((1 - construction) * prop_mass_ratio - dm / mass) - construction
+    # return 1 - ((1 - construction) * prop_mass_ratio - dm / mass) - construction
+
+    return gr
 
 
-def optimize_initial_params():
-    # Define optimization parameters
-    gamma = np.radians(np.arange(0, 90, 5))
-    v0 = np.arange(100, 1000, 50)
+def optimize_initial_params(gamma, v0):
 
     # Initialize arrays to save solution
     useful_mass_fraction = np.zeros((len(gamma), len(v0)))
@@ -181,12 +190,15 @@ def optimize_initial_params():
 
 
 if __name__ == '__main__':
+
+    # Design range
     gamma = np.radians(np.arange(0, 90, 5))
-    v0 = np.arange(100, 1000, 50)
+    v0 = np.arange(200, 2000, 100)
 
-    useful_mass_fraction = optimize_initial_params()
+    useful_mass_fraction = optimize_initial_params(gamma, v0)
 
-    for i, row in enumerate(useful_mass_fraction):
+    for i in range(len(useful_mass_fraction[:,0])):
+        row = useful_mass_fraction[i,:]
         if np.isnan(row).all():
             continue
 
@@ -198,7 +210,7 @@ if __name__ == '__main__':
     plt.imshow(useful_mass_fraction)
 
     cbar = plt.colorbar()
-    cbar.set_label('Useful mass fraction')
+    cbar.set_label('Gear ratio')
 
     plt.xticks(ticks=np.arange(0, len(v0[1:]), 2), labels=np.array(np.round(v0[1::2]), dtype=int))
     plt.yticks(ticks=np.arange(0, len(gamma[1:]), 5), labels=np.array(np.round(np.degrees(gamma[1::5])), dtype=int))
