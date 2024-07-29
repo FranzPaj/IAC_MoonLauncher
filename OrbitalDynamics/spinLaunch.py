@@ -6,6 +6,7 @@ from tqdm import tqdm
 from pycode.HelperFunctions import gravitational_param_dict, average_radius_dict
 import warnings
 
+# TODO: reintroduce Rocket class in Helper functions, deleted while merging (only if SpinLaunch class could actually be useful)
 
 # class SpinLaunch:
 #     # TODO: Implement parameter optimization in class
@@ -75,7 +76,14 @@ import warnings
 #         plt.show()
 
 
-#### Functions for Moon launch, assuming a flat Moon
+###########################################################################
+# FLAT MOON ###############################################################
+###########################################################################
+
+'''
+Functions for modeling Moon launch, assuming a flat Moon with vertical gravity. 
+Old model, still working, good for validation (no conspiracy, I swear).
+'''
 
 def launch(angle, v0,
            Isp: float = 300,
@@ -178,31 +186,47 @@ def launch(angle, v0,
     return gr
 
 
-#### Functions for Moon launch, assuming a planar, circular Moon
+###########################################################################
+# CIRCULAR MOON ###########################################################
+###########################################################################
+
+'''
+Functions for modeling Moon launch, assuming a planar, circular Moon.
+Still requires some checking and validation (who doesn't, ammiright?).
+'''
 
 def polar_int_fun(t, state, thrust, g, Isp):
+    '''
+    Integration helper function for the IVP solver. Takes as an input the state and returns the state 
+    derivatives with regard to time.
+    '''
 
-    r = state[0]
-    theta = state[1]
-    gamma = state[2]
-    v = state[3]
-    mtot = state[4]
-    mp = state[5]
+    r = state[0]  # Radial distance from Moon
+    theta = state[1]  # Polar angle
+    gamma = state[2]  # Flight-path angle
+    v = state[3]  # Planar velocity
+    mtot = state[4]  # Total mass
+    mp = state[5]  # Mass of propellant to be burnt
 
+    # Check if propellant is finished
     if mp < 0:
         thrust = 0
 
-    rdot = v * np.sin(gamma)
-    thetadot = v * np.cos(gamma) / r
-    gammadot = - 1 / v * g * np.cos(gamma) * (1 - v**2 / (g * r))
-    vdot = thrust / mtot - g * np.sin(gamma)
-    mdot = - thrust / (Isp * g)
+    rdot = v * np.sin(gamma)  # From simple kinematics
+    thetadot = v * np.cos(gamma) / r  # From simple kinematics
+    gammadot = - 1 / v * g * np.cos(gamma) * (1 - v**2 / (g * r))  # From Re-entry Systems - I'll share the sauce later, Javi
+    vdot = thrust / mtot - g * np.sin(gamma)  # From Rocket Motion (and simple dynamics)
+    mdot = - thrust / (Isp * g)  # Better than Tsiolkovskji, does not require integration with time
 
     state_dot = np.array([rdot, thetadot, gammadot, vdot, mdot, mdot])
 
     return state_dot
 
 def get_tangency_condition(gamma0, v0, thrust, g, Isp, construction_ratio, m0, ratio_guess):
+    '''
+    Function for finding the altitude over the Moon for which tangency of a constant thrust gravity turn occurs for
+    a given propellant ratio.
+    '''
 
     mtot0 = m0  # Total mass at t0
     mp0 = m0 * (1 - construction_ratio) * ratio_guess  # Propellant to be burnt during ascent
@@ -217,23 +241,27 @@ def get_tangency_condition(gamma0, v0, thrust, g, Isp, construction_ratio, m0, r
     # Define arguments
     args = (thrust, g, Isp)
     # Define parameters for integration
-    time_span_orbit = [0, 24 * 3600]
+    time_span_orbit = [0, 24 * 3600]  # Dummy time span of 1 day, integration will be done earlier though
     tol = 1.0e-12 # Relative and absolute tolerance for integration
     # Define initial state
     x0 = np.array([r0, theta0, gamma0, v0, mtot0, mp0])
+    # Execute integration
     sol = scipy.integrate.solve_ivp(polar_int_fun, time_span_orbit, x0, method='RK45',
                                 rtol = tol, atol = tol, args = args, events = stop_condition)
-
     y = sol.y.T  # Get history of state vectors
     h_fin = y[-1,0] - average_radius_dict['Moon']  # Get tangency altitude over Moon surface
 
     return h_fin
 
 def get_orbit_reaching_condition(gamma0, v0, thrust, g, Isp, construction_ratio, m0, prop_ratio, h_th):
+    '''
+    Function for finding the state with which the spacecraft reaches a given altitude. Useful for getting
+    needed quantities for the final propellant ratio.
+    '''
 
     mtot0 = m0  # Total mass at t0
     mp0 = m0 * (1 - construction_ratio) * prop_ratio  # Propellant to be burnt during ascent
-    r0 = average_radius_dict['Moon'] + 1e-6  # Radius at t0
+    r0 = average_radius_dict['Moon']  # Radius at t0 - m
     theta0 = 0  # Polar angle at t0
 
     # Integrate EoMs
@@ -241,7 +269,7 @@ def get_orbit_reaching_condition(gamma0, v0, thrust, g, Isp, construction_ratio,
     def stop_condition(t, state, thrust, g, Isp):
         return state[0] - (average_radius_dict['Moon'] + h_th)
     stop_condition.terminal = True
-    # Define arguments
+    # Define arguments - constants useful during the integration
     args = (thrust, g, Isp)
     # Define parameters for integration
     time_span_orbit = [0, 24 * 3600]
@@ -254,9 +282,9 @@ def get_orbit_reaching_condition(gamma0, v0, thrust, g, Isp, construction_ratio,
     y = sol.y.T  # Get history of state vectors
     h_fin = y[-1,0] - average_radius_dict['Moon']  # Get tangency altitude over Moon surface
     mtot_fin = y[-1, 4]  # Get final mass
-    v_fin = y[-1, 3]
-    gamma_fin = y[-1,2]
-    mp_fin = y[-1,5]
+    v_fin = y[-1, 3]  # Get final velocity
+    gamma_fin = y[-1,2]  # Get final flight-path anlge
+    mp_fin = y[-1,5]  # Get final propellant-to-be-burnt mass
 
     return h_fin, mtot_fin, v_fin, gamma_fin, mp_fin
 
@@ -265,35 +293,46 @@ def launch_circular(gamma0, v0,
            construction_ratio: float = 0.1,
            mass: float = 1000,
            thrust: float = 1000):
-    '''Equations of motion for gravity turn in polar coordinates'''
+    '''
+    Function for finding the propellant ratio for which tangency at a given altitude occurs,using a constant thrust gravity turn.
+    The solution-searching algorithm searches the ratio interval [0, 1] by bisecting the interval at each passage and verifying
+    whether the solution is in the lower or higher half. This assumes that the function is continuous and monotone, which seems 
+    about right honestly.
+    '''
 
     g = 1.625  # Gravity on the Moon
-    v_target = np.sqrt(gravitational_param_dict['Moon'] / (average_radius_dict['Moon'] + 1e5))  # Orbital velocity
+    v_target = np.sqrt(gravitational_param_dict['Moon'] / (average_radius_dict['Moon'] + 1e5))  # Orbital velocity at 100 km
 
     h_th = 1e5  # Define threshold altitude
     convergence_flag = False  # Define flag used to check whether solution has been found
-    convergence_range = 1e-2  # Define precision requested for finding the correct ratio
-    unfeasible_flag = False
+    convergence_range = 1e-2  # Define precision requested for finding the correct ratio (gicen in absolute value)
+    unfeasible_flag = False  # Define flag to check whether a gravity turn is achievable for the given initial conditions
 
-    # Start bisection algorithm to find tangency condition
+    # Start bisection algorithm to find tangency condition - the ratio search space is [0, 1]
     ratio_low_guess = 0
     ratio_high_guess = 1
 
+    # Evaluate the tangency altitude for the extrema of the search space
     h_low_guess = get_tangency_condition(gamma0, v0, thrust, g, Isp, construction_ratio, mass, ratio_low_guess)
     h_high_guess = get_tangency_condition(gamma0, v0, thrust, g, Isp, construction_ratio, mass, ratio_high_guess)
 
+    # Check if no propellant is already sufficient
     if h_low_guess > h_th:
         ratio_sol = ratio_low_guess
         convergence_flag = True
+    # Check if trajectory is unfeasible even burning all the propellant
     if h_high_guess < h_th:
         ratio_sol = np.nan
         convergence_flag = True
         unfeasible_flag = True
+    # For all other cases, the solution exists! :)
 
+    # Initialise middle point
     ratio_middle_guess = (ratio_high_guess + ratio_low_guess) / 2
 
     while not convergence_flag:
 
+        # Evaluate tangency at middle point
         h_middle_guess = get_tangency_condition(gamma0, v0, thrust, g, Isp, construction_ratio, mass, ratio_middle_guess)
 
         # Check whether the middle point will be the new high or low extreme of the interval
@@ -302,6 +341,7 @@ def launch_circular(gamma0, v0,
         else:
             ratio_low_guess = ratio_middle_guess
 
+        # Find new middle point
         ratio_middle_guess = (ratio_high_guess + ratio_low_guess) / 2
 
         # Check whether we reached convergence
@@ -309,6 +349,7 @@ def launch_circular(gamma0, v0,
             convergence_flag = True
             ratio_sol = (ratio_high_guess + ratio_low_guess)/2
 
+    # If gravity turn is feasible, calculate the gear ratio when accounting for the circularisation manoeuvre
     if not unfeasible_flag:
 
         # Calculate final impulse for circularization
@@ -319,7 +360,7 @@ def launch_circular(gamma0, v0,
         ### Calculate gear ratio (ratio between the total propellant at t0 and the propellant that can be delivered) ###
         mp_initial = mass * (1 - construction_ratio)  # Initial propellant
         mp_pl = mass * (1 - construction_ratio) * (1 - ratio_sol)  # Payload propellant
-        mp_leftover = mp_fin  # Leftover propellant
+        mp_leftover = mp_fin  # Leftover propellant (if not all assigned prop was burnt during ascent)
         mp_end = mp_pl + mp_leftover - dm_manoeuvre  # Propellant in orbit
 
         gr = mp_initial / mp_end  # Gear ratio
@@ -330,8 +371,7 @@ def launch_circular(gamma0, v0,
     return gr
 
 
-# Launch_alt function, to be removed after verification of the new launch_circular
-
+##### TODO Launch_alt function, to be removed after verification of the new launch_circular
 def launch_alt(angle, v0,
            Isp: float = 300,
            construction_ratio: float = 0.1,
