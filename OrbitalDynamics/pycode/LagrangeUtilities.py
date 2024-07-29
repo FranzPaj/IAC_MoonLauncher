@@ -4,14 +4,16 @@ condition or use the continuation technique for obtaining a closed orbit in the 
 The functions here have already been validated during the Special Topics in Astrodynamics coursework.
 '''
 
+# General imports
 import numpy as np
 import scipy
 import warnings
 
-MU_STD = 403503235673642.2  # Default Earth-Moon gravitational parameter - m**3 / s**2
+# Custom imports
+from pycode.CustomConstants import mu_combined as MU_STD
 
 ###########################################################################
-# CONVERT TO CR3BP ########################################################
+# HELPER FUNCTIONS ########################################################
 ###########################################################################
 
 def fun_3d(t, state, mu, beta, orientation_type, orientation):

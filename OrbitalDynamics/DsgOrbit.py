@@ -7,6 +7,7 @@ are then saved for further analysis.
 
 # General imports
 import numpy as np
+import matplotlib.pyplot as plt
 import os
 
 # Tudat imports
@@ -15,6 +16,8 @@ from tudatpy import constants
 
 # Custom imports
 from pycode import LagrangeUtilities as LagrUtil
+from pycode.CustomConstants import mu_combined, MU_ADIMENSIONAL
+from pycode import PlotGenerator as PlotGen
 
 
 ###########################################################################
@@ -63,12 +66,6 @@ earth_initial_state = spice.get_body_cartesian_state_at_epoch(
     aberration_corrections='NONE',
     ephemeris_time = 25 * constants.JULIAN_YEAR )
 
-# Fetch gravitational parameters from SPICE
-mu_earth = spice.get_body_gravitational_parameter('Earth')
-mu_moon = spice.get_body_gravitational_parameter('Moon')
-mu_combined = mu_earth + mu_moon
-
-print(mu_combined)
 
 ###########################################################################
 # CONVERT TO CR3BP ########################################################
@@ -77,6 +74,7 @@ print(mu_combined)
 #### Get the adimensionalisation factors
 # Get length adimensionalisation factor
 length_adim_factor = np.linalg.norm(moon_initial_state[:3] - earth_initial_state[:3])  # Earth-Moon distance - m
+print(length_adim_factor)
 # Get time adimensionalisation factor
 sma_earth_moon = length_adim_factor  # In first approximation, circular motion
 t_period = 2 * np.pi * np.sqrt(sma_earth_moon**3 / mu_combined)
@@ -98,12 +96,36 @@ new_vel = np.array([np.dot(dsg_initial_vel, ihat), np.dot(dsg_initial_vel, jhat)
 new_pos = new_pos / length_adim_factor  # Adimensionalise position
 new_vel = new_vel / length_adim_factor * time_adim_factor  # Adimensionalise verlocity
 new_state = np.concatenate((new_pos, new_vel))
-dsg_cr_state = new_state  # CR3BP DSG initial state obtained
-
+dsg_x0_old = new_state  # CR3BP DSG initial state obtained
+print(dsg_x0_old)
 
 ###########################################################################
 # OBTAIN CLOSED ORBIT #####################################################
 ###########################################################################
+
+# Define parameters for integration
+time_span_orbit = [0, 2*np.pi]
+num_points_orbit = 1000
+tol_orbit = 1.0E-12 # Relative and absolute tolerance for integration
+
+args = (MU_ADIMENSIONAL, 0, 'constant', np.array([0,0,0]))
+t, y_nasa = LagrUtil.propagate_3d_orbit(dsg_x0_old, time_span_orbit, tol_orbit, num_points_orbit, args)
+
+# Define cases to display in graphs
+cases_dict = {
+    'nasa':{
+        'states':y_nasa,
+        'color':'black',
+        'linestyle':'-',
+        'label':'NASA SPICE'
+    },
+}
+cases_displayed = ['nasa']
+
+# Obtain graphs
+fig = PlotGen.halo_plot(cases_dict, cases_displayed)
+plt.show()
+
 
 
 
