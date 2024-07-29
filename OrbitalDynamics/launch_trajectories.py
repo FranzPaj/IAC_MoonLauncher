@@ -1,4 +1,4 @@
-from pycode.HelperFunctions import Orbit, average_radius_dict, gravitational_param_dict, LaunchTrajectory, initial_velocity, initial_launch_angle
+from pycode.HelperFunctions import Orbit, Transfer
 from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,26 +7,16 @@ import os
 
 if __name__ == '__main__':
 
-    # Define gloabal and design parameters
-    R_moon = average_radius_dict['Moon']
-    mu_moon = gravitational_param_dict['Moon']
-    h = 100e3
+    # Test for direct Hohmann transfer
 
-    initial_v = np.sqrt(2 * (mu_moon / R_moon - mu_moon / (2 * R_moon + h)))
-    trajectory = LaunchTrajectory('Moon', initial_v, 0)
+    parking_orbit = Orbit('Earth', (300 + 6371) * 10**3, 0)
+    target_orbit = Orbit('Mars', (300 + 3390) * 10**3, 0)
 
-    V0 = [initial_v]
-    deltaV = [trajectory.get_deltav_for_circularization()]
-    for angle in range(1, 90):
-        initial_v = fsolve(initial_velocity, 1e3, args=(np.radians(angle), h))[0]
-        trajectory = LaunchTrajectory('Moon', initial_v, np.radians(angle))
+    direct_transfer = Transfer(parking_orbit, target_orbit, 'Sun')
 
-        V0.append(initial_v)
-        deltaV.append(trajectory.get_deltav_for_circularization())
+    deltav = direct_transfer.get_transfer_delta_V()
 
+    print(deltav)
 
-    plt.plot(range(90), deltaV)
-    plt.xlabel('Launch angle [deg]')
-    plt.ylabel('Delta-V [m/s]')
-    plt.savefig(os.path.join('plots', 'delta_v_vs_gamma.png'))
-    plt.show()
+    
+
