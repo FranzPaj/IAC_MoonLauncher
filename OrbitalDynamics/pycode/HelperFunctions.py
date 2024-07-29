@@ -10,9 +10,13 @@ from functools import partial
 # Tudat imports
 from tudatpy.interface import spice
 from tudatpy.astro.element_conversion import cartesian_to_keplerian
+from tudatpy.numerical_simulation import environment_setup
+from tudatpy.numerical_simulation import environment
+from tudatpy.astro import two_body_dynamics, element_conversion
+
 
 ###################################################
-####### LOAD USEFUL CELESTIAL PARAMETERS ###########
+####### LOAD USEFUL CELESTIAL PARAMETERS ##########
 ###################################################
 
 # Load spice kernels
@@ -67,6 +71,8 @@ sma_earth = keplerian_state_earth[0]
 ##################################################
 ############## CUSTOM CLASSES ####################
 ##################################################
+
+
 # TODO: Document classes and methods
 class Orbit:
     '''
@@ -419,10 +425,162 @@ class Transfer:
 
         return delta_V if not full_output else (delta_V, inner_impulse, outer_impulse)
 
+        return delta_V if not full_output else (delta_V, departure_impulse, arrival_impulse)
+    
+
+class PlanetDirectTransfer:
+
+    def __init__(self, departure_body: str, target_body: str, sma_tar: str, ecc_tar: str):
+
+        # Attribute instance properties
+        self.departure_body = departure_body
+        self.target_body = target_body
+        self.sma_tar = sma_tar
+        self.ecc_tar = ecc_tar
+
+        # Define new instance properties
+        self.r_dep = sma_dict[self.departure_body]
+        self.r_tar = sma_dict[self.target_body]
+
+        self.bodies = self.create_simulation_bodies()
+
+    def create_simulation_bodies(self) -> environment.SystemOfBodies:
+
+        """
+        Creates the body objects required for the simulation, using the
+        environment_setup.create_system_of_bodies for natural bodies,
+        and manual definition for vehicles
+
+        Parameters
+        ----------
+        none
+
+        Return
+        ------
+        Body objects required for the simulation.
+
+        """
+
+        # Create settings for celestial bodies
+        bodies_to_create = ['Sun',self.departure_body, self.target_body]
+        global_frame_origin = 'Sun'
+        global_frame_orientation = 'ECLIPJ2000'
+        body_settings = environment_setup.get_default_body_settings(
+        bodies_to_create, global_frame_origin, global_frame_orientation)
+
+        # Create environment
+        bodies = environment_setup.create_system_of_bodies(body_settings)
+
+        return bodies
+
+    def get_lambert_problem_result(
+        self,
+        departure_epoch: float,
+        tof: float ) -> environment.Ephemeris:
+
+        """"
+        This function solved Lambert's problem for a transfer from Earth (at departure epoch) to
+        a target body (at arrival epoch), with the states of Earth and the target body defined
+        by ephemerides stored inside the SystemOfBodies object (bodies). Note that this solver
+        assumes that the transfer departs/arrives to/from the center of mass of Earth and the target body
+
+        Parameters
+        ----------
+        bodies : Body objects defining the physical simulation environment
+
+        target_body : The name (string) of the body to which the Lambert arc is to be computed
+
+        departure_epoch : Epoch at which the departure from Earth's center of mass is to take place
+
+        arrival_epoch : Epoch at which the arrival at he target body's center of mass is to take place
+
+        Return
+        ------
+        TBD
+        """
+
+        # Gravitational parameter of the Sun
+        central_body_gravitational_parameter = self.bodies.get_body("Sun").gravitational_parameter
+
+        global_frame_orientation = 'ECLIPJ2000'
+        # Set initial and final positions for Lambert targeter
+        initial_state = spice.get_body_cartesian_state_at_epoch(
+            target_body_name=self.departure_body,
+            observer_body_name="Sun",
+            reference_frame_name=global_frame_orientation,
+            aberration_corrections="NONE",
+            ephemeris_time=departure_epoch)
+
+        final_state = spice.get_body_cartesian_state_at_epoch(
+            target_body_name=self.target_body,
+            observer_body_name="Sun",
+            reference_frame_name=global_frame_orientation,
+            aberration_corrections="NONE",
+            ephemeris_time=departure_epoch + tof)
+
+        # Create Lambert targeter
+        lambertTargeter = two_body_dynamics.LambertTargeterIzzo(
+            initial_state[:3], final_state[:3], tof, central_body_gravitational_parameter)
+
+        # Compute initial Cartesian state of Lambert arc
+        lambert_arc_initial_state = initial_state
+        lambert_arc_initial_state[3:] = lambertTargeter.get_departure_velocity()
+
+        # Compute final Cartesian state of Lambert arc
+        lambert_arc_final_state = final_state
+        lambert_arc_final_state[3:] = lambertTargeter.get_arrival_velocity()
+
+        return lambert_arc_initial_state, lambert_arc_final_state
+
+    def get_excess_vel(self, sc_state, epoch, body):
+
+        # Fetch velocity of the target body
+        body_state = spice.get_body_cartesian_state_at_epoch(
+            target_body_name=body,
+            observer_body_name="Sun",
+            reference_frame_name='ECLIPJ2000',
+            aberration_corrections="NONE",
+            ephemeris_time=epoch)
+        body_vel = body_state[3:]
+        # Get velocity of the spacecraft
+        sc_vel = sc_state[3:]
+        # Get relative velocity at arrival
+        relative_vel = sc_vel - body_vel
+        # Calculate excess velocity
+        excess_vel = np.linalg.norm(relative_vel)
+
+        return excess_vel
+    
+    def get_deltav_capture(self, arrival_excess_vel):
+
+        mu = gravitational_param_dict[self.target_body]  # Define relevant gravitational parameter
+        rp = self.sma_tar * (1 - self.ecc_tar)  # Find periapsis of target orbit
+        v_target = np.sqrt(mu * (2 / rp - 1 / self.sma_tar))  # Find velocity that needs to be achieved
+        v_actual = np.sqrt(arrival_excess_vel**2 + 2 * mu / rp)  # Find actual arrival velocity at periapsis
+        deltav_capture = v_actual - v_target
+
+        return deltav_capture
+
+    def get_transfer_parameters(self, departure_epoch, tof):
+
+        # Solve Lambert problem
+        initial_lambert_state, final_lambert_state = self.get_lambert_problem_result(departure_epoch, tof)
+        # Get departure excess velocity
+        departure_excess_vel = self.get_excess_vel(initial_lambert_state, departure_epoch, self.departure_body)
+        # Get arrival excess velocity
+        arrival_epoch = departure_epoch + tof
+        arrival_excess_vel = self.get_excess_vel(final_lambert_state, arrival_epoch, self.target_body)
+        # Get capture DeltaV
+        deltav_capture = self.get_deltav_capture(arrival_excess_vel)
+
+        return departure_excess_vel, arrival_excess_vel, deltav_capture
+    
 
 ########################################
 ######### CUSTOM FUNCTIONS #############
 ########################################
+
+
 
 def get_sma_from_altitude(orbited_body: str,
                           altitude: float):
