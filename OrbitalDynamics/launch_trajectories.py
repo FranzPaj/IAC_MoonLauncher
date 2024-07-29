@@ -2,10 +2,12 @@ from pycode.HelperFunctions import Orbit, average_radius_dict, gravitational_par
 from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 
 if __name__ == '__main__':
 
+    # Define gloabal and design parameters
     R_moon = average_radius_dict['Moon']
     mu_moon = gravitational_param_dict['Moon']
     h = 100e3
@@ -26,5 +28,5 @@ if __name__ == '__main__':
     plt.plot(range(90), deltaV)
     plt.xlabel('Launch angle [deg]')
     plt.ylabel('Delta-V [m/s]')
-    plt.savefig('Plots\\delta_v_vs_gamma.pdf')
+    plt.savefig(os.path.join('plots', 'delta_v_vs_gamma.png'))
     plt.show()
