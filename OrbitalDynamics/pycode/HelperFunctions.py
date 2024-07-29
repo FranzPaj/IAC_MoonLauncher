@@ -50,6 +50,7 @@ sma_dict = {
     'Saturn': 1433.5e9,
     'Uranus': 2872.5e9,
     'Neptune': 4495.1e9,
+    'Moon': 384.4e6,
 }
 
 # Approximate orbit semi-major axes at t = 0 (J2000)
@@ -223,23 +224,19 @@ class Transfer:
         self.target_orbit = target_orbit
         self.transfer_body = orbited_body_during_transfer
 
-        if orbited_body_during_transfer != 'Sun':
-            # So far the class only supports planet to planet transfers, or planet to moon transfers (and vice-versa)
-            if r1 is None or r2 is None:
-                raise ValueError(
-                    'Please provide the initial (r1) and final (r2) distances for transfers not around the Sun')
-            if (orbited_body_during_transfer != parking_orbit.orbited_body or
-                    orbited_body_during_transfer != target_orbit.orbited_body):
-                raise ValueError(
-                    'The transfer body should be either the departure or target body for a transfer not around the Sun')
-
         if r1 is None:
-            self.r1 = sma_dict[parking_orbit.orbited_body]
+            if parking_orbit.orbited_body == orbited_body_during_transfer:
+                self.r1 = parking_orbit.rp
+            else:
+                self.r1 = sma_dict[parking_orbit.orbited_body]
         else:
             self.r1 = r1
 
         if r2 is None:
-            self.r2 = sma_dict[target_orbit.orbited_body]
+            if target_orbit.orbited_body == orbited_body_during_transfer:
+                self.r2 = target_orbit.rp
+            else:
+                self.r2 = sma_dict[target_orbit.orbited_body]
         else:
             self.r2 = r2
 
@@ -249,10 +246,70 @@ class Transfer:
         self.transfer_orbit = Orbit(orbited_body_during_transfer, sma, ecc)
 
     def get_transfer_delta_V(self, full_output: bool = False):
-        if self.transfer_body == 'Sun':
-            return self._three_body_delta_V(full_output)
+        # TODO: V&V this function and delete the subsequent 2
+        ############################### Calculate the velocities of the planets #######################################
+        if self.parking_orbit.orbited_body != self.transfer_orbit.orbited_body:
+            v_planet_departure = (
+                np.sqrt(gravitational_param_dict[self.transfer_body] / sma_dict[self.parking_orbit.orbited_body]))
         else:
-            return self._two_body_delta_V(full_output)
+            v_planet_departure = 0
+            out_bound = True
+
+        if self.target_orbit.orbited_body != self.transfer_orbit.orbited_body:
+            v_planet_arrival = (
+                np.sqrt(gravitational_param_dict[self.transfer_body] / sma_dict[self.target_orbit.orbited_body]))
+        else:
+            v_planet_arrival = 0
+            out_bound = False
+
+        if v_planet_arrival != 0 and v_planet_departure != 0:
+            if v_planet_arrival < v_planet_departure:
+                # Outwards transfer
+                out_bound = True
+            else:
+                # Inwards transfer
+                out_bound = False
+
+        ####################################### Departure impulse ####################################################
+        if self.parking_orbit.orbited_body != self.transfer_body:
+            # Planet-centred departure velocity (v infinity)
+            v_inf_1 = self.transfer_orbit.vp - v_planet_departure if out_bound \
+                else self.transfer_orbit.va - v_planet_departure
+
+            # Periapsis velocity of the hyperbolic orbit
+            v1 = np.sqrt(v_inf_1 ** 2 + 2 * gravitational_param_dict[self.parking_orbit.orbited_body] / self.parking_orbit.rp)
+
+            # Impulse to enter said hyperbolic orbit
+            departure_impulse = np.abs(v1 - self.parking_orbit.vp)
+        else:
+            departure_impulse = np.abs(self.transfer_orbit.vp - self.parking_orbit.vp) if out_bound else\
+                np.abs(self.transfer_orbit.va - self.parking_orbit.vp)
+
+        ####################################### Arrival impulse ####################################################
+        if self.target_orbit.orbited_body != self.transfer_body:
+            # Planet-centred departure velocity (v infinity)
+            v_inf_2 = self.transfer_orbit.vp - v_planet_arrival if not out_bound \
+                else self.transfer_orbit.va - v_planet_arrival
+
+            # Periapsis velocity of the hyperbolic orbit
+            v2 = np.sqrt(v_inf_2 ** 2 + 2 * gravitational_param_dict[
+                self.target_orbit.orbited_body] / self.target_orbit.rp)
+
+            # Impulse to enter said hyperbolic orbit
+            arrival_impulse = np.abs(v2 - self.target_orbit.vp)
+        else:
+            arrival_impulse = np.abs(self.transfer_orbit.vp - self.target_orbit.vp) if not out_bound else \
+                np.abs(self.transfer_orbit.va - self.target_orbit.vp)
+
+        ######################################### Calculate delta-V ##################################################
+        delta_V = departure_impulse + arrival_impulse
+
+        return delta_V if not full_output else (delta_V, departure_impulse, arrival_impulse)
+
+        # if self.transfer_body == 'Sun':
+        #     return self._three_body_delta_V(full_output)
+        # else:
+        #     return self._two_body_delta_V(full_output)
 
     def _two_body_delta_V(self, full_output: bool = False):
         """
@@ -264,7 +321,6 @@ class Transfer:
             :param full_output: bool --> flag to return the delta-V for each body separately
             :return: float or tuple (3) --> delta-V for the transfer (and individual delta-Vs if full_output is True)
         """
-        # TODO: V&V function
 
         ################################## Obtain relevant parameters #################################################
         # Gravitational parameter of the main orbited body
@@ -282,7 +338,7 @@ class Transfer:
 
         ####################### Calculate Earth-centred properties at the SOI border ###################################
         # Planet-centred velocity at the SoI
-        v_SOI = np.sqrt(2 * mu0 / r_SOI - mu0 / self.transfer_orbit.rp + self.transfer_orbit.vp ** 2 / 2)
+        v_SOI = np.sqrt(2 * (mu0 / r_SOI - mu0 / self.transfer_orbit.rp + self.transfer_orbit.vp ** 2 / 2))
 
         # Flight-path angle at the border of the SoI
         gamma_SOI = np.arccos(self.transfer_orbit.h / (r_SOI * v_SOI))
@@ -402,11 +458,16 @@ def initial_launch_angle(gamma: float, V0: float = 1754, h0: float = 100e3):
 
 
 if __name__ == '__main__':
-    parking = Orbit('Earth', 300 + 6371e3, 0)
-    target = Orbit('Mars', 300 + 3390e3, 0)
+    parking = Orbit('Earth', 300e3 + average_radius_dict['Earth'], 0)
+    target = Orbit('Mars', 300e3 + average_radius_dict['Mars'], 0)
+    target_2 = Orbit('Moon', 100e3 + average_radius_dict['Moon'], 0)
 
     transfer_1 = Transfer(parking, target)
     transfer_2 = Transfer(target, parking)
     print(transfer_1.get_transfer_delta_V(True))
     print(transfer_2.get_transfer_delta_V(True))
 
+    transfer_3 = Transfer(parking, target_2, 'Earth')
+    transfer_4 = Transfer(target_2, parking, 'Earth')
+    print(transfer_3.get_transfer_delta_V(True))
+    print(transfer_4.get_transfer_delta_V(True))
