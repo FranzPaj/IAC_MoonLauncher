@@ -25,8 +25,19 @@ if __name__ == '__main__':
 
     direct_transfer = PlanetDirectTransfer('Earth', 'Mars', sma_arr, ecc_arr,)
 
-    tup = direct_transfer.get_transfer_parameters(22 * constants.JULIAN_YEAR, 250 * constants.JULIAN_DAY)
+    # circa a Hohmann transfer
+    departure_epoch = 22 * constants.JULIAN_YEAR + (9*30 + 2 + 4) * constants.JULIAN_DAY
+    tof = 259 * constants.JULIAN_DAY
+    earth_sma_dep = (6371 + 300) * 10 ** 3 
+    earth_ecc_dep = 0
 
-    print(tup)
+    moon_sma_dep = (3390 + 100) * 10 ** 3
+    moon_ecc_dep = 0
+
+    earth_deltav = direct_transfer.get_deltav_earth_launch(departure_epoch, tof, earth_sma_dep, earth_ecc_dep)
+    moon_deltav = direct_transfer.get_deltav_moon_launch(departure_epoch, tof, moon_sma_dep, moon_ecc_dep)
+
+    print('DeltaV needed if launching from the Earth:', earth_deltav / 10**3, 'km/s')
+    print('DeltaV needed if launching from the Moon:', moon_deltav / 10**3, 'km/s')
 
 

@@ -67,6 +67,7 @@ cartesian_state_earth = spice.get_body_cartesian_state_at_epoch('Earth', 'Sun', 
 keplerian_state_earth = cartesian_to_keplerian(cartesian_state_earth, mu_sun)
 sma_earth = keplerian_state_earth[0]
 
+debug_flag = False
 
 ##################################################
 ############## CUSTOM CLASSES ####################
@@ -532,7 +533,7 @@ class PlanetDirectTransfer:
 
         return lambert_arc_initial_state, lambert_arc_final_state
 
-    def get_excess_vel(self, sc_state, epoch, body):
+    def get_excess_vel_vec(self, sc_state, epoch, body):
 
         # Fetch velocity of the target body
         body_state = spice.get_body_cartesian_state_at_epoch(
@@ -544,12 +545,10 @@ class PlanetDirectTransfer:
         body_vel = body_state[3:]
         # Get velocity of the spacecraft
         sc_vel = sc_state[3:]
-        # Get relative velocity at arrival
-        relative_vel = sc_vel - body_vel
-        # Calculate excess velocity
-        excess_vel = np.linalg.norm(relative_vel)
+        # Get relative velocity at arrival - aka excess velocity
+        excess_vel_vec = sc_vel - body_vel
 
-        return excess_vel
+        return excess_vel_vec
     
     def get_deltav_capture(self, arrival_excess_vel):
 
@@ -566,19 +565,93 @@ class PlanetDirectTransfer:
         # Solve Lambert problem
         initial_lambert_state, final_lambert_state = self.get_lambert_problem_result(departure_epoch, tof)
         # Get departure excess velocity
-        departure_excess_vel = self.get_excess_vel(initial_lambert_state, departure_epoch, self.departure_body)
+        departure_excess_vel_vec = self.get_excess_vel_vec(initial_lambert_state, departure_epoch, self.departure_body)
         # Get arrival excess velocity
         arrival_epoch = departure_epoch + tof
-        arrival_excess_vel = self.get_excess_vel(final_lambert_state, arrival_epoch, self.target_body)
+        arrival_excess_vel_vec = self.get_excess_vel_vec(final_lambert_state, arrival_epoch, self.target_body)
         # Get capture DeltaV
-        deltav_capture = self.get_deltav_capture(arrival_excess_vel)
+        arrival_excess_vel_norm = np.linalg.norm(arrival_excess_vel_vec)
+        deltav_capture = self.get_deltav_capture(arrival_excess_vel_norm)
 
-        return departure_excess_vel, arrival_excess_vel, deltav_capture
+        return departure_excess_vel_vec, deltav_capture
     
+    def get_moon_departure_deltav(self, excess_vel_vec, sma_dep, ecc_dep, departure_epoch):
+
+        mu_earth = gravitational_param_dict['Earth']
+        mu_moon = gravitational_param_dict['Moon']
+
+        # Get magnitude and direction of excess velocity at the boundary of the Earth SoI
+        excess_vel_norm = np.linalg.norm(excess_vel_vec)
+        excess_vel_versor = excess_vel_vec / excess_vel_norm
+        # Get Earth-Moon relative position and state
+        moon_state = spice.get_body_cartesian_state_at_epoch(
+                target_body_name='Moon',
+                observer_body_name="Earth",
+                reference_frame_name='ECLIPJ2000',
+                aberration_corrections="NONE",
+                ephemeris_time=departure_epoch)
+        moon_earth_distance = np.linalg.norm(moon_state[:3])
+        moon_vel = moon_state[3:]
+        # Get magnitude of velocity vector when leaving the Moon SoI
+        vel_norm_moon_soi = np.sqrt(excess_vel_norm**2 + 2 * mu_earth / moon_earth_distance)  # Hyperbolic velocity magnitude at Moon's SoI in Earth frame
+        vel_vec_moon_soi = vel_norm_moon_soi * excess_vel_versor  # Hyperbolic velocity magnitude at Moon's SoI in Earth frame
+        # Get Moon-centered excess velocity
+        excess_vel_moon = np.linalg.norm(vel_vec_moon_soi - moon_vel)  # Norm of the excess velocity in the Moon reference frame
+        if debug_flag:
+            print('Moon velocity:', np.linalg.norm(moon_vel))
+            print('Arrival excess velocity at Moon SoI:', excess_vel_moon)
+
+        # Parameters of the parking Moon orbit
+        rp = sma_dep * (1 - ecc_dep)  # Periselene radius
+        vp_0 = np.sqrt(mu_moon * (2 / rp - 1 / sma_dep))  # Initial velocity at periselene
+        vp_needed = np.sqrt(excess_vel_moon**2 + 2 * mu_moon / rp)  # Needed velocity at periselene for departure
+        deltav = vp_needed - vp_0
+
+        return deltav
+
+    def get_earth_departure_deltav(self, excess_vel_vec, sma_dep, ecc_dep):
+
+        mu_earth = gravitational_param_dict['Earth']
+        excess_vel_norm = np.linalg.norm(excess_vel_vec)
+        # Parameters of the parking Moon orbit
+        rp = sma_dep * (1 - ecc_dep)  # Pericenter radius
+        vp_0 = np.sqrt(mu_earth * (2 / rp - 1 / sma_dep))  # Initial velocity at pericenter
+        vp_needed = np.sqrt(excess_vel_norm**2 + 2 * mu_earth / rp)  # Needed velocity at pericenter for departure
+        deltav = vp_needed - vp_0
+
+        return deltav
+    
+    def get_deltav_earth_launch(self, departure_epoch, tof, sma_dep, ecc_dep):
+        
+        # Get parameters of interplanetary transfer and capture
+        departure_excess_vel_vec, deltav_capture = self.get_transfer_parameters(departure_epoch, tof)
+        # Get DeltaV needed for departure
+        deltav_departure = self.get_earth_departure_deltav(departure_excess_vel_vec, sma_dep, ecc_dep)
+        # Get total DeltaV
+        deltav_total = deltav_departure + deltav_capture
+
+        return deltav_total
+    
+    def get_deltav_moon_launch(self, departure_epoch, tof, sma_dep, ecc_dep):
+        
+        # Get parameters of interplanetary transfer and capture
+        departure_excess_vel_vec, deltav_capture = self.get_transfer_parameters(departure_epoch, tof)
+        # Get DeltaV needed for departure
+        deltav_departure = self.get_moon_departure_deltav(departure_excess_vel_vec, sma_dep, ecc_dep, departure_epoch)
+        # Get total DeltaV
+        deltav_total = deltav_departure + deltav_capture
+
+        return deltav_total
+
+
 
 ########################################
 ######### CUSTOM FUNCTIONS #############
 ########################################
+
+
+
+
 
 
 
@@ -613,6 +686,9 @@ def initial_velocity(V0: float, gamma: float = 0, h: float = 100e3):
 
 def initial_launch_angle(gamma: float, V0: float = 1754, h0: float = 100e3):
     return initial_velocity(V0, gamma, h0)
+
+
+
 
 
 if __name__ == '__main__':
