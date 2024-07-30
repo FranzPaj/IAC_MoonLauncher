@@ -39,32 +39,58 @@ spice.load_kernel(os.path.join(current_dir, 'input_data', 'receding_horiz_3189_1
 # FETCH RELEVANT TABULATED DATA ###########################################
 ###########################################################################
 
-# Get initial states
-# Define initial state for Deep Space Gateway 25 years after J2000
+# Find a moment around 25 years after J2000 for which the DSG is at its apex
+dsg_period = 28 * 2 / 9 * constants.JULIAN_DAY
+t0 = 25 * constants.JULIAN_YEAR  # Epoch - s
+
+num_points = 1000
+epoch_ls = np.linspace(t0, t0 + dsg_period, num=num_points)
+z_ls = np.zeros(num_points)
+
+for i, epoch in enumerate(epoch_ls):
+    # Get initial states
+    # Define initial state for Deep Space Gateway 25 years after J2000
+    dsg_initial_state = spice.get_body_cartesian_state_at_epoch(
+        target_body_name='-60000',
+        observer_body_name='EARTH MOON BARYCENTER',
+        reference_frame_name='ECLIPJ2000',
+        aberration_corrections='NONE',
+        ephemeris_time = epoch)
+    dsg_initial_pos = dsg_initial_state[:3]
+    dsg_initial_vel = dsg_initial_state[3:]
+
+    z_ls[i] = dsg_initial_pos[2]
+
+# Find maximum
+maximum_index = np.argmax(z_ls)
+# Get definitive starting epoch
+epoch = epoch_ls[maximum_index]
+
+# Define initial state for Deep Space Gateway at epoch
 dsg_initial_state = spice.get_body_cartesian_state_at_epoch(
     target_body_name='-60000',
     observer_body_name='EARTH MOON BARYCENTER',
     reference_frame_name='ECLIPJ2000',
     aberration_corrections='NONE',
-    ephemeris_time = 25 * constants.JULIAN_YEAR )
+    ephemeris_time = epoch)
 dsg_initial_pos = dsg_initial_state[:3]
 dsg_initial_vel = dsg_initial_state[3:]
-# Get initial state for Moon 25 years after J2000
+# Get initial state at epoch
 moon_initial_state = spice.get_body_cartesian_state_at_epoch(
     target_body_name='Moon',
     observer_body_name='EARTH MOON BARYCENTER',
     reference_frame_name='ECLIPJ2000',
     aberration_corrections='NONE',
-    ephemeris_time = 25 * constants.JULIAN_YEAR )
+    ephemeris_time = epoch)
 moon_initial_pos = moon_initial_state[:3]
 moon_initial_vel = moon_initial_state[3:]
-# Get initial state for Earth 25 years after J2000
+# Get initial state at epoch
 earth_initial_state = spice.get_body_cartesian_state_at_epoch(
     target_body_name='Earth',
     observer_body_name='EARTH MOON BARYCENTER',
     reference_frame_name='ECLIPJ2000',
     aberration_corrections='NONE',
-    ephemeris_time = 25 * constants.JULIAN_YEAR )
+    ephemeris_time = epoch)
 
 
 ###########################################################################
@@ -74,7 +100,6 @@ earth_initial_state = spice.get_body_cartesian_state_at_epoch(
 #### Get the adimensionalisation factors
 # Get length adimensionalisation factor
 length_adim_factor = np.linalg.norm(moon_initial_state[:3] - earth_initial_state[:3])  # Earth-Moon distance - m
-print(length_adim_factor)
 # Get time adimensionalisation factor
 sma_earth_moon = length_adim_factor  # In first approximation, circular motion
 t_period = 2 * np.pi * np.sqrt(sma_earth_moon**3 / mu_combined)
@@ -96,20 +121,31 @@ new_vel = np.array([np.dot(dsg_initial_vel, ihat), np.dot(dsg_initial_vel, jhat)
 new_pos = new_pos / length_adim_factor  # Adimensionalise position
 new_vel = new_vel / length_adim_factor * time_adim_factor  # Adimensionalise verlocity
 new_state = np.concatenate((new_pos, new_vel))
-dsg_x0_old = new_state  # CR3BP DSG initial state obtained
-print(dsg_x0_old)
+dsg_x0_nasa = new_state  # CR3BP DSG initial state obtained
+
 
 ###########################################################################
 # OBTAIN CLOSED ORBIT #####################################################
 ###########################################################################
 
 # Define parameters for integration
-time_span_orbit = [0, 2*np.pi]
-num_points_orbit = 1000
-tol_orbit = 1.0E-12 # Relative and absolute tolerance for integration
-
+T_nom = 2 * np.pi * 2 / 9
+T_period = 29.53049 / 27.32158 * T_nom  # Conversion from sydereal period to synodic period
+T_period = 30.5 / 27.32158 * T_nom  # Super-Manual and ugly correction because continuation is not super-precise
+time_span_orbit = [0, T_period]  # Span of a typical DSG orbit
+tol_orbit = 1.0E-12  # Relative and absolute tolerance for integration
+tol_correction = 1.0e-13  # Absolute tolerance for error in orbit continuation
 args = (MU_ADIMENSIONAL, 0, 'constant', np.array([0,0,0]))
-t, y_nasa = LagrUtil.propagate_3d_orbit(dsg_x0_old, time_span_orbit, tol_orbit, num_points_orbit, args)
+
+
+# Get the first, uncorrected orbit
+t, y_nasa = LagrUtil.propagate_3d_orbit(dsg_x0_nasa, time_span_orbit, tol_orbit, args)
+
+# Get a corrected starting condition with the continuation method
+x0_corrected, iter = LagrUtil.orbit_continuation(dsg_x0_nasa, MU_ADIMENSIONAL, print_flag=False)
+print('Needed correction:', x0_corrected - dsg_x0_nasa)
+# Get the corrected orbit
+t, y_corrected = LagrUtil.propagate_3d_orbit(x0_corrected, time_span_orbit, tol_correction, args)
 
 # Define cases to display in graphs
 cases_dict = {
@@ -119,8 +155,14 @@ cases_dict = {
         'linestyle':'-',
         'label':'NASA SPICE'
     },
+    'corrected':{
+        'states':y_corrected,
+        'color':'blue',
+        'linestyle':'-',
+        'label':'corrected for CR3BP'
+    },
 }
-cases_displayed = ['nasa']
+cases_displayed = ['nasa', 'corrected']
 
 # Obtain graphs
 fig = PlotGen.halo_plot(cases_dict, cases_displayed)

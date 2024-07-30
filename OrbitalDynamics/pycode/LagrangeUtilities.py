@@ -107,17 +107,16 @@ def fun_var(t, state, mu, beta, orientation_type, orientation):
 
     return state_dot
 
-def propagate_3d_orbit(initial_state, t_span, tol, num_points, args=(MU_STD, 0, 'constant', np.array([0,0,0]))):
+def propagate_3d_orbit(initial_state, t_span, tol, args=(MU_STD, 0, 'constant', np.array([0,0,0]))):
     '''
     Function for propagating a 3D orbit in the CR3BP starting from an initial condition.
     '''
 
-    t_eval = np.linspace(t_span[0], t_span[1], num_points)
     sol = scipy.integrate.solve_ivp(fun_3d, t_span, initial_state, method='RK45', dense_output = True, rtol = tol, atol = tol, args = args)
 
     return sol.t, sol.y.T
 
-def orbit_continuation(x0, mu, beta, orientation_type = 'constant', orientation = np.zeros(3), print_flag = False):
+def orbit_continuation(x0, mu, beta = 0, orientation_type = 'constant', orientation = np.zeros(3), print_flag = False):
     '''
     Function that uses a continuation technique to obtain a periodic orbit from a first approximated semi-periodic solution.
     '''
