@@ -14,65 +14,16 @@ from tudatpy.numerical_simulation import environment_setup
 from tudatpy.numerical_simulation import environment
 from tudatpy.astro import two_body_dynamics, element_conversion
 
+# Custom imports
+from pycode.CustomConstants import gravitational_param_dict, average_radius_dict, sma_dict
 
-###################################################
-####### LOAD USEFUL CELESTIAL PARAMETERS ##########
-###################################################
-
-# Load spice kernels
-spice.load_standard_kernels()
-
-# Gravitational parameters
-mu_sun = spice.get_body_gravitational_parameter('Sun')
-mu_moon = spice.get_body_gravitational_parameter('Moon')
-mu_earth = spice.get_body_gravitational_parameter('Earth')
-mu_mars = spice.get_body_gravitational_parameter('Mars')
-gravitational_param_dict = {
-    'Sun': mu_sun,
-    'Earth': mu_earth,
-    'Moon': mu_moon,
-    'Mars': mu_mars,
-}
-# Average radius
-R_sun = spice.get_average_radius('Sun')
-R_moon = spice.get_average_radius('Moon')
-R_earth = spice.get_average_radius('Earth')
-R_mars = spice.get_average_radius('Mars')
-average_radius_dict = {
-    'Sun': R_sun,
-    'Earth': R_earth,
-    'Moon': R_moon,
-    'Mars': R_mars,
-}
-
-sma_dict = {
-    'Mercury': 57.9e9,
-    'Venus': 108.2e9,
-    'Earth': 149.6e9,
-    'Mars': 227.9e9,
-    'Jupiter': 778.6e9,
-    'Saturn': 1433.5e9,
-    'Uranus': 2872.5e9,
-    'Neptune': 4495.1e9,
-    'Moon': 384.4e6,
-}
-
-# Approximate orbit semi-major axes at t = 0 (J2000)
-# Moon around Earth
-cartesian_state_moon = spice.get_body_cartesian_state_at_epoch('Moon', 'Earth', 'ECLIPJ2000', 'NONE', 0)
-keplerian_state_moon = cartesian_to_keplerian(cartesian_state_moon, mu_earth)
-sma_moon = keplerian_state_moon[0]
-# Earth around Sun
-cartesian_state_earth = spice.get_body_cartesian_state_at_epoch('Earth', 'Sun', 'ECLIPJ2000', 'NONE', 0)
-keplerian_state_earth = cartesian_to_keplerian(cartesian_state_earth, mu_sun)
-sma_earth = keplerian_state_earth[0]
-
+# Activate available debugging prints
 debug_flag = False
 
-##################################################
-############## CUSTOM CLASSES ####################
-##################################################
 
+###########################################################################
+# CUSTOM CLASSES ##########################################################
+###########################################################################
 
 # TODO: Document classes and methods
 class Orbit:
@@ -137,7 +88,6 @@ class Orbit:
         vc = np.sqrt(self.mu / self.ra)
         return vc - self.va
 
-
 class LaunchTrajectory(Orbit):
     def __init__(self, orbited_body: str, initial_velocity: float = 1703.54, launch_angle: float = 0):
 
@@ -200,7 +150,6 @@ class LaunchTrajectory(Orbit):
             return angle[0]
         else:
             raise ValueError('No solution found for the initial launch angle, try a different initial speed')
-
 
 class Transfer:
     """
@@ -428,7 +377,6 @@ class Transfer:
 
         return delta_V if not full_output else (delta_V, departure_impulse, arrival_impulse)
     
-
 class PlanetDirectTransfer:
 
     def __init__(self, departure_body: str, target_body: str, sma_tar: str, ecc_tar: str):
@@ -644,16 +592,9 @@ class PlanetDirectTransfer:
         return deltav_total
 
 
-
-########################################
-######### CUSTOM FUNCTIONS #############
-########################################
-
-
-
-
-
-
+###########################################################################
+# CUSTOM FUNCTIONS ########################################################
+###########################################################################
 
 def get_sma_from_altitude(orbited_body: str,
                           altitude: float):
@@ -666,7 +607,6 @@ def get_sma_from_altitude(orbited_body: str,
 
     return sma
 
-
 def initial_velocity(V0: float, gamma: float = 0, h: float = 100e3):
     """
     Calculate initial velocity to reach an altitude h with a particular launch angle at the Moon
@@ -676,6 +616,8 @@ def initial_velocity(V0: float, gamma: float = 0, h: float = 100e3):
     :return: float --> initial velocity.
     """
 
+    R_moon = average_radius_dict['Moon']
+    mu_moon = gravitational_param_dict['Moon']
     p = (R_moon * V0 * np.cos(gamma)) ** 2 / mu_moon
     e = np.sqrt(1 - R_moon * V0 ** 2 / mu_moon * (2 - R_moon * V0 ** 2 / mu_moon) * np.cos(gamma) ** 2)
 
@@ -683,13 +625,13 @@ def initial_velocity(V0: float, gamma: float = 0, h: float = 100e3):
     ra_target = R_moon + h
     return ra - ra_target
 
-
 def initial_launch_angle(gamma: float, V0: float = 1754, h0: float = 100e3):
     return initial_velocity(V0, gamma, h0)
 
 
-
-
+###########################################################################
+# TESTING #################################################################
+###########################################################################
 
 if __name__ == '__main__':
     parking = Orbit('Earth', 300e3 + average_radius_dict['Earth'], 0)

@@ -2,7 +2,6 @@
 Module with reusable plotting functions for generic plotting and single-use plotting functions for the specific project.
 """
 
-
 # Generic imports
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -157,7 +156,9 @@ def cart_plot(t: np.ndarray[float], r: np.ndarray[float], v: np.ndarray[float]) 
         'grid':True,
         'tick_fontsize':tick_fs,
     }
-    plotter_2d_3plot(ax_r,t,r[:,0],r[:,1],r[:,2],param_dict_rx,param_dict_ry, param_dict_rz)
+    ax_r.plot(t, r[:,0], param_dict_rx)
+    ax_r.plot(t, r[:,1], param_dict_ry)
+    ax_r.plot(t, r[:,2], param_dict_rz)
     fig_formatter(ax_r,opts_r)
     # Define the velocity subplot
     ax_v = axs[1] 
@@ -185,7 +186,9 @@ def cart_plot(t: np.ndarray[float], r: np.ndarray[float], v: np.ndarray[float]) 
         'legend_location':'upper right',
         'grid':True
     }
-    plotter_2d_3plot(ax_v,t,v[:,0],v[:,1],v[:,2],param_dict_vx,param_dict_vy, param_dict_vz)
+    ax_v.plot(t, v[:,0], param_dict_vx)
+    ax_v.plot(t, v[:,1], param_dict_vy)
+    ax_v.plot(t, v[:,2], param_dict_vz)
     fig_formatter(ax_v,opts_v)
 
     return fig_cart
@@ -237,7 +240,7 @@ def kep_plot(t: np.ndarray[float], kepler_elements: np.ndarray[float]) -> plt.fi
         'grid':True,
         'tick_fontsize':tick_fs,
     }
-    plotter_2d_1plot(ax_a,t,a,param_dict_a)
+    ax_a.plot(t, a, **param_dict_a)
     fig_formatter(ax_a,opts_a)
     # Define the true anomaly subplot
     ax_theta = axs[1,0]
@@ -255,7 +258,7 @@ def kep_plot(t: np.ndarray[float], kepler_elements: np.ndarray[float]) -> plt.fi
         'grid':True,
         'tick_fontsize':tick_fs,
     }
-    plotter_2d_1plot(ax_theta,t,theta,param_dict_theta)
+    ax_theta.plot(t,theta,**param_dict_theta)
     fig_formatter(ax_theta,opts_theta)
     # Define the eccentricity subplot
     ax_e = axs[2,0]
@@ -273,7 +276,7 @@ def kep_plot(t: np.ndarray[float], kepler_elements: np.ndarray[float]) -> plt.fi
         'grid':True,
         'tick_fontsize':tick_fs,
     }
-    plotter_2d_1plot(ax_e,t,e,param_dict_e)
+    ax_e.plot(t,e,**param_dict_e)
     fig_formatter(ax_e,opts_e)
     # Define the inclination subplot
     ax_i = axs[0,1]
@@ -291,7 +294,7 @@ def kep_plot(t: np.ndarray[float], kepler_elements: np.ndarray[float]) -> plt.fi
         'grid':True,
         'tick_fontsize':tick_fs,
     }
-    plotter_2d_1plot(ax_i,t,i,param_dict_i)
+    ax_i.plot(t,i,**param_dict_i)
     fig_formatter(ax_i,opts_i)
     # Define the right ascension of the ascending node subplot
     ax_raan = axs[1,1]
@@ -309,7 +312,7 @@ def kep_plot(t: np.ndarray[float], kepler_elements: np.ndarray[float]) -> plt.fi
         'grid':True,
         'tick_fontsize':tick_fs,
     }
-    plotter_2d_1plot(ax_raan,t,raan,param_dict_raan)
+    ax_raan.plot(t,raan,**param_dict_raan)
     fig_formatter(ax_raan,opts_raan)
     # Define the argument of periapsis subplot
     ax_arg_per = axs[2,1]
@@ -329,7 +332,7 @@ def kep_plot(t: np.ndarray[float], kepler_elements: np.ndarray[float]) -> plt.fi
         'tick_fontsize':tick_fs,
 
     }
-    plotter_2d_1plot(ax_arg_per,t,arg_per,param_dict_arg_per)
+    ax_arg_per(t,arg_per,**param_dict_arg_per)
     fig_formatter(ax_arg_per,opts_arg_per)
 
     return fig_kep
@@ -354,11 +357,11 @@ def generic_plot(t:np.ndarray[float], fun: np.ndarray[float]) -> plt.figure:
     fig,ax = plt.subplots(figsize=[9,6])
     # fig.suptitle('Sun acceleration magnitude',fontsize=22)
     # Define the position residuals plot
-    param_dict_acc = {
+    param_dict = {
         'color':'red',
         # 'label':r'$\rho$'
     }
-    opts_acc = {
+    opts = {
         'xlabel':'?',
         'ylabel':'?',
         # 'xlim':[t[0],t[-1]],
@@ -367,8 +370,8 @@ def generic_plot(t:np.ndarray[float], fun: np.ndarray[float]) -> plt.figure:
         'grid':True,
         'tick_fontsize':tick_fs,
     }
-    plotter_2d_1plot(ax,t,fun,param_dict_acc)
-    fig_formatter(ax,opts_acc)
+    ax.plot(t, fun, **param_dict)
+    fig_formatter(ax,opts)
     plt.tight_layout()
 
     return fig
