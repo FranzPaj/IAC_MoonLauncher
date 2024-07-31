@@ -1,29 +1,21 @@
-from pycode.HelperFunctions import Orbit, Transfer, PlanetDirectTransfer
+from pycode.HelperFunctions import Orbit, Transfer, DirectPlanetTransfer
 from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import time
 from tudatpy import constants
 
+###########################################################################
+# TEST FUNCTIONS ##########################################################
+###########################################################################
 
-
-if __name__ == '__main__':
-
-    # Test for direct Hohmann transfer
+def lambert_test():
 
     sma_arr = (300 + 3390) * 10**3  # Test orbit around Mars with a 300 km altitude
     ecc_arr = 0
 
-    parking_orbit = Orbit('Earth', (300 + 6371) * 10**3, 0)
-    target_orbit = Orbit('Mars', sma_arr, ecc_arr)
-
-    direct_transfer = Transfer(parking_orbit, target_orbit, 'Sun')
-
-    deltav = direct_transfer.get_transfer_delta_V()
-
-    # Test for Lambert Targeter
-
-    direct_transfer = PlanetDirectTransfer('Earth', 'Mars', sma_arr, ecc_arr,)
+    direct_transfer = DirectPlanetTransfer('Earth', 'Mars', sma_arr, ecc_arr,)
 
     # circa a Hohmann transfer
     departure_epoch = 22 * constants.JULIAN_YEAR + (9*30 + 2 + 4) * constants.JULIAN_DAY
@@ -39,5 +31,33 @@ if __name__ == '__main__':
 
     print('DeltaV needed if launching from the Earth:', earth_deltav / 10**3, 'km/s')
     print('DeltaV needed if launching from the Moon:', moon_deltav / 10**3, 'km/s')
+
+    return
+
+def hohmann_test():
+
+    sma_arr = (300 + 3390) * 10**3  # Test orbit around Mars with a 300 km altitude
+    ecc_arr = 0
+
+    parking_orbit = Orbit('Earth', (300 + 6371) * 10**3, 0)
+    target_orbit = Orbit('Mars', sma_arr, ecc_arr)
+
+    direct_transfer = Transfer(parking_orbit, target_orbit, 'Sun')
+
+    deltav = direct_transfer.get_transfer_delta_V()
+
+    return
+
+if __name__ == '__main__':
+
+    #### Test for direct Hohmann transfer
+
+    hohmann_test()
+
+    #### Test for Lambert Targeter
+
+    lambert_test()
+
+
 
 

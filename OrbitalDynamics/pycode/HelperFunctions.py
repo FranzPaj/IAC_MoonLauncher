@@ -377,7 +377,7 @@ class Transfer:
 
         return delta_V if not full_output else (delta_V, departure_impulse, arrival_impulse)
     
-class PlanetDirectTransfer:
+class DirectPlanetTransfer:
 
     def __init__(self, departure_body: str, target_body: str, sma_tar: str, ecc_tar: str):
 

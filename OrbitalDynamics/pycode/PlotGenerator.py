@@ -488,6 +488,16 @@ def orbit_generic(r: np.ndarray[float]):
 
 
 ###########################################################################
+# GENERAL-PRUPOSE PLOTS ###################################################
+###########################################################################
+
+def porkchop_plot(departure_time_ls:np.ndarray[float], tof_ls: np.ndarray[float], deltav_matrix: np.ndarray[float], 
+                  deltav_cutoff: float=10, contour_lines_flag: bool=False) -> plt.figure:
+    return
+
+
+
+###########################################################################
 # CR3BP TRAJECTORY PLOTS ##################################################
 ###########################################################################
 

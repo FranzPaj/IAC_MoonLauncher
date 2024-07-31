@@ -7,7 +7,6 @@ import numpy as np
 
 # Tudat imports
 from tudatpy.interface import spice
-from tudatpy import constants
 
 spice.load_standard_kernels()
 
