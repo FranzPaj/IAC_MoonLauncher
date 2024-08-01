@@ -58,22 +58,22 @@ if __name__ == '__main__':
                 earth_sma_dep = (6371 + 300) * 10 ** 3 
                 earth_ecc_dep = 0
                 # Get the DeltaV
-                deltav_matrix = np.zeros((len(departure_time_ls), len(tof_ls)))
+                deltav_matrix = np.zeros((len(tof_ls), len(departure_time_ls)))
                 # Evaluate DeltaV
                 for i, departure_time in enumerate(departure_time_ls):
                     for j, tof in enumerate(tof_ls):
                         deltav = direct_transfer.get_deltav_earth_launch(departure_time, tof, earth_sma_dep, earth_ecc_dep)
-                        deltav_matrix[i, j] = deltav
+                        deltav_matrix[j, i] = deltav
             case 'moon_launch':
                 moon_sma_dep = (3390 + 100) * 10 ** 3
                 moon_ecc_dep = 0
                 # Get the DeltaV
-                deltav_matrix = np.zeros((len(departure_time_ls), len(tof_ls)))
+                deltav_matrix = np.zeros((len(tof_ls), len(departure_time_ls)))
                 # Evaluate DeltaV
                 for i, departure_time in enumerate(departure_time_ls):
                     for j, tof in enumerate(tof_ls):
                         deltav = direct_transfer.get_deltav_moon_launch(departure_time, tof, moon_sma_dep, moon_ecc_dep)
-                        deltav_matrix[i, j] = deltav
+                        deltav_matrix[j, i] = deltav
 
         # Store the data
         output_path = os.path.join(current_dir, 'output', 'mars_transfer', option + '.txt')

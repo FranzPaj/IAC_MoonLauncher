@@ -7,6 +7,12 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 
+from matplotlib.colors import BoundaryNorm
+from matplotlib.ticker import MaxNLocator
+
+# Tudat imports
+from tudatpy import constants
+
 # Custom imports
 from pycode.CustomConstants import R_M_ADIMENSIONAL, MU_ADIMENSIONAL
 
@@ -493,8 +499,96 @@ def orbit_generic(r: np.ndarray[float]):
 
 def porkchop_plot(departure_time_ls:np.ndarray[float], tof_ls: np.ndarray[float], deltav_matrix: np.ndarray[float], 
                   deltav_cutoff: float=10, contour_lines_flag: bool=False) -> plt.figure:
-    return
 
+    # Convert to normal people units
+    departure_time_ls = departure_time_ls / constants.JULIAN_YEAR + 2000  # Years
+    tof_ls = tof_ls / constants.JULIAN_DAY  # Days
+    deltav_matrix = deltav_matrix / 10**3  # km/s
+
+    fig, ax = plt.subplots()
+
+    # Define the contour levels
+    levels = MaxNLocator(nbins=15).tick_values(deltav_matrix.min(), deltav_cutoff)
+
+    # Define the colormap
+    cmap = plt.colormaps['plasma']
+    norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
+
+    # contours are *point* based plots, so convert our bound into point centers
+    cf = ax.contourf(departure_time_ls + (departure_time_ls[1] - departure_time_ls[0])/2.,
+    tof_ls + (tof_ls[1] - tof_ls[0])/2., deltav_matrix, levels=levels,
+                    cmap=cmap, vmin=0, vmax=deltav_cutoff)
+    fig.colorbar(cf, ax=ax)
+
+    return fig
+
+# plot porkchop plot
+def stolen(title, xlist, ylist,
+                  xy_contour_data_1, xy_contour_data_2, clevels,
+                  xy_tof_data, tlevels):
+    
+    def set_ticks(ax):
+        # major grid
+        x_tick_spacing, y_tick_spacing = 5, 3
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(x_tick_spacing))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(y_tick_spacing))
+        # fontsize of major, minor ticks label
+        ax.xaxis.set_tick_params(labelsize=7, rotation=90)
+        ax.yaxis.set_tick_params(labelsize=7)
+        ax.set_xlabel("Dep Date (dd-mm-yyyy)", fontsize=8)        
+        ax.set_ylabel("Arr Date (dd-mm-yyyy)", fontsize=8)
+
+        # Customize the major grid
+        ax.grid(which='major', linestyle='dashdot', linewidth='0.5', color='gray')
+        # Customize the minor grid
+        ax.grid(which='minor', linestyle='dotted', linewidth='0.5', color='gray')       
+        # Turn on the minor ticks (minor grid)
+        ax.minorticks_on()        
+        # Turn off the display of all ticks.
+        ax.tick_params(which='both',
+                        top='off',
+                        left='off',
+                        right='off',
+                        bottom='off')
+        # end function
+        return
+
+    # countour text format ( include 'days')
+    def tp_fmt(x):
+        s = f"{x:.1f}"
+        return rf"{s} days"
+    
+    # init figure    
+    plt.figure(figsize=(12,9))
+
+    # find the minimum value with the corresponding dep, arr dates
+    # Type-I minimum
+    # draw ∆V contours
+    cp1 = plt.contour(xlist, ylist, xy_contour_data_1, clevels, cmap="rainbow")
+    plt.clabel(cp1, inline=True, fontsize=7)
+
+    # find the minimum value with the corresponding dep, arr dates
+    # type-II
+    # draw ∆V contours
+    cp2 = plt.contour(xlist, ylist, xy_contour_data_2, clevels, cmap="rainbow")
+    plt.clabel(cp2, inline=True, fontsize=7)
+    
+    # draw time-of-flight contours
+    tp = plt.contour(xlist, ylist, xy_tof_data, tlevels, colors='k',linestyles=':')
+    plt.clabel(tp, inline=True, fmt=tp_fmt, fontsize=7)
+    
+    # set title and x, y labels
+    plt.title(title, fontdict={'fontsize':8})
+    
+    # # set grids and ticks
+    # set_ticks(plt.gca())
+    
+    # set aspect ratio and layout
+    plt.gca().set_aspect(1) #'auto')   
+    plt.tight_layout()
+    # show
+    plt.show()
+    return
 
 
 ###########################################################################
