@@ -166,11 +166,11 @@ class Transfer:
 
         Methods
         -------
-        get_transfer_delta_V():
+        get_transfer_delta_V(full_output=False):
             Calculates the total delta-V required for the transfer.
         _two_body_delta_V(full_output=False):
             Calculates the delta-V for a transfer between two bodies.
-        _three_body_delta_V():
+        _three_body_delta_V(full_output=False):
             Calculates the delta-V for a transfer between two bodies around the Sun.
     """
 
