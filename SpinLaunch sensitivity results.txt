@@ -13,27 +13,27 @@ ST: the total contribution of an input variable X_i to the output variance, incl
 		S_Ti = 1 - Var[E(Y|X_~i)] / Var(Y)
 
                     S1   S1_conf	      ST  ST_conf
-angle          0.358571  0.292534	0.308919  0.305534
-v0             0.335653  0.427990       0.718810  0.601447
-Isp            0.461830  0.381616	0.486684  0.303765
-construction   0.365603  0.428245	0.716883  0.394750
-mass           0.359486  0.347310	0.589992  0.363306
-thrust         0.379677  0.580766	1.061288  0.506391
+angle          0.077021  0.299525	0.416195  0.443323
+v0             0.160910  0.345763       1.009109  1.664433
+Isp            0.178616  0.433567	0.707669  0.509096
+construction   0.318092  0.503358	0.879485  0.564203
+mass           0.569992  0.577494	1.440521  0.840852
+thrust         0.355725  0.535610	1.082709  0.684402
 
 
                               S2   S2_conf
-(angle, v0)            -0.356069  0.722967
-(angle, Isp)           -0.539853  0.661505
-(angle, construction)  -0.211934  0.729760
-(angle, mass)          -0.001062  0.523980
-(angle, thrust)         0.094852  0.721807
-(v0, Isp)              -0.441630  0.737226
-(v0, construction)     -0.133682  0.773077
-(v0, mass)             -0.167015  0.656504
-(v0, thrust)           -0.017317  0.651461
-(Isp, construction)    -0.445205  1.004381
-(Isp, mass)            -0.299654  0.730599
-(Isp, thrust)          -0.160908  0.860060
-(construction, mass)   -0.180210  0.672665
-(construction, thrust)  0.043313  0.787635
-(mass, thrust)          0.060438  0.890577
+(angle, v0)            -0.264982  0.825657
+(angle, Isp)            0.238828  0.604007
+(angle, construction)   0.361395  0.929292
+(angle, mass)           0.274342  0.842658
+(angle, thrust)         0.581282  0.960272
+(v0, Isp)               0.176278  0.596153
+(v0, construction)      0.242670  1.016614
+(v0, mass)              0.177394  0.954856
+(v0, thrust)            0.492827  1.102601
+(Isp, construction)    -0.007229  0.638970
+(Isp, mass)            -0.168340  0.549470
+(Isp, thrust)           0.128517  0.778464
+(construction, mass)   -0.511041  0.777137
+(construction, thrust) -0.310336  0.613836
+(mass, thrust)         -0.599113  0.719420

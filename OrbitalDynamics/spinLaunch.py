@@ -3,7 +3,7 @@ import scipy
 import matplotlib.pyplot as plt
 import matplotlib
 from tqdm import tqdm
-from pycode.HelperFunctions import gravitational_param_dict, average_radius_dict
+from OrbitalDynamics.pycode.CustomConstants import gravitational_param_dict, average_radius_dict
 import warnings
 
 ###########################################################################

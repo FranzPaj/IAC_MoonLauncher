@@ -2,13 +2,13 @@ import numpy as np
 from tqdm import tqdm
 from SALib.sample import saltelli
 from SALib.analyze import sobol
-from spinLaunch import launch
+from spinLaunch import launch_circular
 
 
 # Define the problem
 problem = {
     'num_vars': 6,
-    'names': ['angle', 'v0', 'Isp','construction', 'mass', 'thrust'],
+    'names': ['angle', 'v0', 'Isp', 'construction', 'mass', 'thrust'],
     'bounds': [[0.05, np.pi / 2 - 0.05],
                [0, 1000],
                [200, 400],
@@ -21,7 +21,7 @@ problem = {
 param_values = saltelli.sample(problem, 2**6)
 
 # Evaluate the model
-mass_fractions = np.array([launch(*params) for params in tqdm(param_values)])
+mass_fractions = np.array([launch_circular(*params) for params in tqdm(param_values)])
 
 print(f'Total sample size = {len(mass_fractions)}')
 
