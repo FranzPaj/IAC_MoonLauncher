@@ -1155,3 +1155,96 @@ def all_manifolds_xz_closeup(starting_points_dict) -> plt.figure:
 
     return fig
 
+def all_manifolds_yz(starting_points_dict) -> plt.figure:
+
+    # Define the writing sizes
+    tick_fs = 12
+    label_fs = 12
+    title_fs = 12
+    legend_fs = 12
+
+    # Create the figure
+    fig,ax = plt.subplots(figsize=figsize)
+
+    for starting_point in starting_points_dict.keys():
+        manifold_dict = starting_points_dict[starting_point]['manifolds']
+        for case in manifold_dict.keys():
+            data_dict = manifold_dict[case]
+            pos = data_dict['states'][:,:3]
+            y = pos[:,1]
+            z = pos[:,2]
+            color = data_dict['color']
+            linestyle = data_dict['linestyle']
+            label = data_dict['label']
+            if starting_point == 0:
+                ax.plot(y, z, color=color, linestyle=linestyle, label=label, linewidth=linewidth_manifolds)
+            else:
+                ax.plot(y, z, color=color, linestyle=linestyle, linewidth=linewidth_manifolds)
+
+
+    opts = {
+        'xlabel':r'$x$ [-]',
+        'ylabel':r'$z$ [-]',
+        'label_fontsize':label_fs,
+        'title_fontsize':title_fs,
+        'legend':True,
+        'grid':True,
+        'tick_fontsize':tick_fs,
+    }
+
+    # Plot Moon
+    ax.add_patch(plt.Circle((0, 0), R_M_ADIMENSIONAL, alpha=0.75, facecolor='grey',edgecolor='black',linewidth = 3,label='Moon'))
+
+    fig_formatter(ax,opts)
+    ax.axis('equal')
+    plt.tight_layout()
+
+    return fig
+
+def all_manifolds_yz_closeup(starting_points_dict) -> plt.figure:
+
+    # Define the writing sizes
+    tick_fs = 12
+    label_fs = 12
+    title_fs = 12
+    legend_fs = 12
+
+    # Create the figure
+    fig,ax = plt.subplots(figsize=figsize)
+
+    for starting_point in starting_points_dict.keys():
+        manifold_dict = starting_points_dict[starting_point]['manifolds']
+        for case in manifold_dict.keys():
+            data_dict = manifold_dict[case]
+            pos = data_dict['states'][:,:3]
+            y = pos[:,1]
+            z = pos[:,2]
+            color = data_dict['color']
+            linestyle = data_dict['linestyle']
+            label = data_dict['label']
+            if starting_point == 0:
+                ax.plot(y, z, color=color, linestyle=linestyle, label=label, linewidth=linewidth_manifolds)
+            else:
+                ax.plot(y, z, color=color, linestyle=linestyle, linewidth=linewidth_manifolds)
+
+
+    opts = {
+        'xlabel':r'$x$ [-]',
+        'ylabel':r'$z$ [-]',
+        'label_fontsize':label_fs,
+        'title_fontsize':title_fs,
+        'legend':True,
+        'grid':True,
+        'xlim':[-0.15,0.15],
+        'ylim':[-0.25,0.05],
+        'tick_fontsize':tick_fs,
+    }
+
+    # Plot Moon
+    ax.add_patch(plt.Circle((0, 0), R_M_ADIMENSIONAL, alpha=0.75, facecolor='grey',edgecolor='black',linewidth = 3,label='Moon'))
+
+    fig_formatter(ax,opts)
+    ax.set_aspect('equal', adjustable='box')
+    plt.tight_layout()
+
+    return fig

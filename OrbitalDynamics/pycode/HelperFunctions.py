@@ -4,6 +4,7 @@ Helper functions and classes that may be useful in other programs
 
 # General imports
 import numpy as np
+import os
 from scipy.optimize import fsolve
 from functools import partial
 
@@ -627,6 +628,40 @@ def initial_velocity(V0: float, gamma: float = 0, h: float = 100e3):
 
 def initial_launch_angle(gamma: float, V0: float = 1754, h0: float = 100e3):
     return initial_velocity(V0, gamma, h0)
+
+def fig_saver(fig_topic: str, fig):
+    """Saves a matplotlib figure to a .png file in the 'plots' folder in project root.
+
+    Arguments:
+        fig_topic: the type of data that is being displayed.
+        fig: the matplotlib figure to be saved.
+    """
+
+    # Create the path to the image to be saved
+    code_path = os.path.dirname(__file__)
+    main_path = os.path.dirname(code_path)
+    dir_path = os.path.join(main_path, 'plots', fig_topic.rsplit('/', 1)[0])
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    file_path = os.path.join(main_path, 'plots', fig_topic + '.png')
+    # Save the figure
+    fig.savefig(file_path,dpi = 150)
+
+    return
+
+def norm_calc(array: np.ndarray[float]) -> np.ndarray[float]:
+    """Calculates the norm of a vector along the first direction.
+    
+    Arguments:
+        array: array to be elaborated.
+    Returns:
+        array_norm: array of the norms.
+    """
+
+    # Calculate the norm
+    array_norm = np.sqrt(np.einsum('ij,ij->i', array, array))
+    
+    return array_norm
 
 
 ###########################################################################

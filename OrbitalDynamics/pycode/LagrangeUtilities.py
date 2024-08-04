@@ -117,7 +117,7 @@ def propagate_3d_orbit(initial_state, t_span, tol, args=(MU_STD, 0, 'constant', 
 
     return sol.t, sol.y.T
 
-def orbit_continuation(x0, mu, beta = 0, orientation_type = 'constant', orientation = np.zeros(3), print_flag = False):
+def orbit_continuation(x0, mu, tol=1e-12,  beta = 0, orientation_type = 'constant', orientation = np.zeros(3), print_flag = False):
     '''
     Function that uses a continuation technique to obtain a periodic orbit from a first approximated semi-periodic solution.
     '''
@@ -130,7 +130,6 @@ def orbit_continuation(x0, mu, beta = 0, orientation_type = 'constant', orientat
 
     # Perform continuation
     t_span = [0,4*np.pi]
-    tol = 1E-12
     args = (mu, beta, orientation_type, orientation)
     error_norm = 1
     iter = 0
@@ -189,6 +188,79 @@ def orbit_continuation(x0, mu, beta = 0, orientation_type = 'constant', orientat
         print('WARNING: the differential correct has not converged!!!')
 
     return x0_sol, iter
+
+def precise_continuation(x0, mu, tol=1e-12,  beta = 0, orientation_type = 'constant', orientation = np.zeros(3), print_flag = False):
+    '''
+    Function that uses a continuation technique to obtain a periodic orbit from a first approximated semi-periodic solution.
+    '''
+
+    print('Continuation started')
+    # Define stop condition at mid orbit
+    def stop_condition(t, state, mu, beta, orientation_type, orientation):
+        return state[1]
+    stop_condition.terminal = True
+    stop_condition.direction = 1.0  # Only stop when y becomes positive again
+
+    # Perform continuation
+    t_span = [0,4*np.pi]
+    args = (mu, beta, orientation_type, orientation)
+    error_norm = 1
+    iter = 0
+    # Conduct integrations
+    while error_norm > 1E-12 and iter < 10:
+        # Integrate
+        x0_with_stm = np.concatenate((x0, np.eye(6).flatten()))
+        sol = scipy.integrate.solve_ivp(fun_var, t_span, x0_with_stm, method='RK45', rtol=tol, atol=tol, args=args, events=stop_condition)
+        y_end = sol.y.T[-1,:]
+        # Isolate final state and final transition matrix
+        final_state = y_end[:6]
+        final_stm = np.reshape(y_end[6:], (6,6))
+        # Identify deviation in xdot and zdot
+        xdot_guess = final_state[3]
+        zdot_guess = final_state[5]
+        error = np.array([xdot_guess, zdot_guess])
+        if print_flag:
+            print('Error:',error)
+        # Create matrix of linear system
+        # Find values for STM elements
+        phi_10 = final_stm[1,0]
+        phi_14 = final_stm[1,4]
+        phi_30 = final_stm[3,0]
+        phi_34 = final_stm[3,4]
+        phi_50 = final_stm[5,0]
+        phi_54 = final_stm[5,4]
+        # Find values for accelerations
+        vdot = compute_total_acceleration(final_state, mu, beta, orientation_type, orientation)
+        vx = final_state[3]
+        vy = final_state[4]
+        vz = final_state[5]
+        ax = vdot[0]
+        ay = vdot[1]
+        az = vdot[2]
+        # Set up linear system
+        coeff = np.array([0, -xdot_guess, - zdot_guess])
+        M = np.array([[phi_10, phi_14, vy], [phi_30, phi_34, ax], [phi_50, phi_54, az]])
+        dx, dydot, dt_half = np.linalg.solve(M, coeff)
+        # dydot = (zdot * xddot_half - xdot * zddot_half)/(zddot_half * phi_34 - xddot_half * phi_54)
+        # Evaluate new initial state
+        x0 = x0 + np.array([dx,0,0,0,dydot,0])
+        # Define conditions for new cycle
+
+        iter = iter + 1
+        error_norm = np.linalg.norm(error)
+        x0_sol = x0
+    
+        if print_flag:
+            print('Required correction',dydot, dt_half)
+            print('Current error:', error_norm, ', current iteration:', iter)
+            print('---*---')
+    
+    if iter >= 10 and error_norm > 1e-12:
+        warnings.warn('WARNING: the differential correct has not converged')
+        print('WARNING: the differential correct has not converged!!!')
+
+    return x0_sol, iter
+
 
 def compute_total_acceleration(state, MU, beta, orientation_type, orientation):
     '''
