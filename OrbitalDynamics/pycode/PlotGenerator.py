@@ -4,6 +4,7 @@ Module with reusable plotting functions for generic plotting and single-use plot
 
 # Generic imports
 import matplotlib.pyplot as plt
+import matplotlib
 from matplotlib.lines import Line2D
 import numpy as np
 
@@ -498,7 +499,13 @@ def orbit_generic(r: np.ndarray[float]):
 ###########################################################################
 
 def porkchop_plot(departure_time_ls:np.ndarray[float], tof_ls: np.ndarray[float], deltav_matrix: np.ndarray[float], 
-                  deltav_cutoff: float=10, contour_lines_flag: bool=False) -> plt.figure:
+                  deltav_scale: float=15, contour_lines_flag: bool=False) -> plt.figure:
+    
+    # Define the writing sizes
+    tick_fs = 12
+    label_fs = 14
+    title_fs = 16
+    legend_fs = label_fs
 
     # Convert to normal people units
     departure_time_ls = departure_time_ls / constants.JULIAN_YEAR + 2000  # Years
@@ -507,20 +514,84 @@ def porkchop_plot(departure_time_ls:np.ndarray[float], tof_ls: np.ndarray[float]
 
     fig, ax = plt.subplots()
 
+    opts = {
+        'xlabel':r'Departure time',
+        'ylabel':r'$ToF$ [days]',
+        'label_fontsize':label_fs,
+        'title_fontsize':title_fs,
+        'tick_fontsize':tick_fs,
+    }
+
     # Define the contour levels
-    levels = MaxNLocator(nbins=15).tick_values(deltav_matrix.min(), deltav_cutoff)
+    levels = MaxNLocator(nbins=40).tick_values(0, deltav_scale)
 
     # Define the colormap
     cmap = plt.colormaps['plasma']
-    norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
+    # norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
+    norm = matplotlib.colors.Normalize(vmin=0, vmax=deltav_scale) 
 
     # contours are *point* based plots, so convert our bound into point centers
     cf = ax.contourf(departure_time_ls + (departure_time_ls[1] - departure_time_ls[0])/2.,
-    tof_ls + (tof_ls[1] - tof_ls[0])/2., deltav_matrix, levels=levels,
-                    cmap=cmap, vmin=0, vmax=deltav_cutoff)
-    fig.colorbar(cf, ax=ax)
+        tof_ls + (tof_ls[1] - tof_ls[0])/2., deltav_matrix, levels=levels,
+                    cmap=cmap, norm=norm)
+    cbar = plt.colorbar(
+            plt.cm.ScalarMappable(cmap=cmap, norm=norm),
+            ax=ax,
+        )
+    # fig.colorbar(cf, ax=ax, label=r'$ToF$ [days]',size = label_fs,)
+    cbar.set_label(label=r'$\Delta V$ [km/s]',size = label_fs,)
+    fig_formatter(ax,opts)
 
     return fig
+
+def feasibility_comparison(res_dict: dict) -> plt.figure:
+    
+    # Define the writing sizes
+    tick_fs = 12
+    label_fs = 14
+    title_fs = 16
+    legend_fs = label_fs
+
+    fig, ax = plt.subplots()
+
+    opts = {
+        'xlabel':r'Departure time',
+        'ylabel':r'$ToF$ [days]',
+        'label_fontsize':label_fs,
+        'title_fontsize':title_fs,
+        'tick_fontsize':tick_fs,
+        # 'legend': True,
+    }
+
+    handles = []
+    # where some data has already been plotted to ax
+    handles, labels = ax.get_legend_handles_labels()
+
+    for case in res_dict.keys():
+        case_dict = res_dict[case]
+        departure_time_ls = case_dict['departure_time'] / constants.JULIAN_YEAR + 2000  # Years
+        tof_ls = case_dict['tof'] / constants.JULIAN_DAY  # Days
+        deltav_matrix = case_dict['deltav'] / 10**3  # km/s
+
+        # Define the contour level
+        deltav_cutoff = case_dict['deltav_cutoff'] / 10**3  # km/s
+        levels = [deltav_cutoff]
+        color = case_dict['color']
+        linestyle = case_dict['linestyle']
+        label = case_dict['label'] + rf' - $\Delta V_{{max}} = {deltav_cutoff}$ km/s'
+
+        legend_entry = Line2D([0], [0], label=label, color=color, linestyle=linestyle)
+        handles.append(legend_entry)
+
+        # contours are *point* based plots, so convert our bound into point centers
+        cf = ax.contour(departure_time_ls + (departure_time_ls[1] - departure_time_ls[0])/2.,
+            tof_ls + (tof_ls[1] - tof_ls[0])/2., deltav_matrix, levels=levels, colors=color, linestyles=linestyle)
+        
+    plt.legend(handles=handles)
+    fig_formatter(ax,opts)
+
+    return fig
+
 
 # plot porkchop plot
 def stolen(title, xlist, ylist,
@@ -530,8 +601,8 @@ def stolen(title, xlist, ylist,
     def set_ticks(ax):
         # major grid
         x_tick_spacing, y_tick_spacing = 5, 3
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(x_tick_spacing))
-        ax.yaxis.set_major_locator(ticker.MultipleLocator(y_tick_spacing))
+        # ax.xaxis.set_major_locator(ticker.MultipleLocator(x_tick_spacing))
+        # ax.yaxis.set_major_locator(ticker.MultipleLocator(y_tick_spacing))
         # fontsize of major, minor ticks label
         ax.xaxis.set_tick_params(labelsize=7, rotation=90)
         ax.yaxis.set_tick_params(labelsize=7)

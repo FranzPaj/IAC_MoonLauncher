@@ -28,9 +28,32 @@ if __name__ == '__main__':
     deltav_matrix_earth = np.loadtxt(os.path.join(data_dir, 'earth_launch.txt'))
     deltav_matrix_moon = np.loadtxt(os.path.join(data_dir, 'moon_launch.txt'))
 
-    fig1 = PlotGen.porkchop_plot(departure_time_ls, tof_ls, deltav_matrix_earth, deltav_cutoff=12)
+    fig1 = PlotGen.porkchop_plot(departure_time_ls, tof_ls, deltav_matrix_earth)
 
-    fig2 = PlotGen.porkchop_plot(departure_time_ls, tof_ls, deltav_matrix_moon, deltav_cutoff=14)
+    fig2 = PlotGen.porkchop_plot(departure_time_ls, tof_ls, deltav_matrix_moon)
+
+    res_dict = {
+        'earth_launch':{
+            'departure_time': departure_time_ls,
+            'tof': tof_ls,
+            'deltav': deltav_matrix_earth,
+            'deltav_cutoff': 8 * 10**3,
+            'color': 'green',
+            'linestyle': '-',
+            'label': 'Earth launch',
+        },
+        'moon_launch':{
+            'departure_time': departure_time_ls,
+            'tof': tof_ls,
+            'deltav': deltav_matrix_moon,
+            'deltav_cutoff': 12 * 10**3,
+            'color': 'grey',
+            'linestyle': '--',
+            'label': 'Moon launch',
+        },
+    }
+
+    fig3 = PlotGen.feasibility_comparison(res_dict)
 
     plt.show()
 
