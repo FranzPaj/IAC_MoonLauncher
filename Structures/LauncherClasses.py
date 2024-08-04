@@ -34,18 +34,20 @@ class MaglevLauncher(Launcher):
             distance += velocity * dt
             time += dt
 
-        # Calculate tota energy consumption
+        # Calculate total energy consumption
         energy = self.max_power * time
         return energy, distance, time
 
     def constant_acceleration_launch(self):
         """
         Function for calculating launch parameters for a scenario with constant acceleration.
+        Power = Force * velocity --> Neglecting launcher mass --> Power = mass * acceleration * velocity
         :returns: energy, distance, time
         """
 
-        time = self.vel / self.max_acceleration
-        distance = 0.5 * self.max_acceleration * time ** 2
-        energy = self.mass * self.vel ** 2 / 2
+        acceleration = self.max_power / (self.mass * self.vel)
+        time = self.vel / acceleration
+        distance = 0.5 * acceleration * time**2
+        energy = 0.5 * self.mass * self.vel**2
         return energy, distance, time
         
