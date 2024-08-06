@@ -1,6 +1,9 @@
 # Cache
 \__pycache__
 
+# Plots
+\plots
+
 # Data files
 *.pyc
 *.iml
