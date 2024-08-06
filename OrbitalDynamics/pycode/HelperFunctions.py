@@ -15,7 +15,7 @@ from tudatpy.numerical_simulation import environment
 from tudatpy.astro import two_body_dynamics, element_conversion
 
 # Custom imports
-from pycode.CustomConstants import gravitational_param_dict, average_radius_dict, sma_dict
+from OrbitalDynamics.pycode.CustomConstants import gravitational_param_dict, average_radius_dict, sma_dict
 
 # Activate available debugging prints
 debug_flag = False
