@@ -3,7 +3,7 @@ import scipy
 import matplotlib.pyplot as plt
 import matplotlib
 from tqdm import tqdm
-from pycode.HelperFunctions import gravitational_param_dict, average_radius_dict
+from OrbitalDynamics.pycode.HelperFunctions import gravitational_param_dict, average_radius_dict
 import warnings
 
 ###########################################################################
@@ -114,7 +114,8 @@ def launch_circular(gamma0, v0,
            Isp: float = 300,
            construction_ratio: float = 0.1,
            mass: float = 1000,
-           thrust: float = 1000):
+           thrust: float = 1000,
+           return_mass_ratio: bool = False):
     '''
     Function for finding the propellant ratio for which tangency at a given altitude occurs,using a constant thrust gravity turn.
     The solution-searching algorithm searches the ratio interval [0, 1] by bisecting the interval at each passage and verifying
@@ -186,6 +187,10 @@ def launch_circular(gamma0, v0,
         mp_pl = mass * (1 - construction_ratio) * (1 - ratio_sol)  # Payload propellant
         mp_leftover = mp_fin  # Leftover propellant (if not all assigned prop was burnt during ascent)
         mp_end = mp_pl + mp_leftover - dm_manoeuvre  # Propellant in orbit
+
+        if return_mass_ratio:
+            # M_propellant / (M_construction + M_payload)
+            return (mp_initial - mp_end) / (mass * construction_ratio + mp_pl)
 
         gr = mp_initial / mp_end  # Gear ratio
 
@@ -320,6 +325,46 @@ def optimize_initial_params(gamma: np.ndarray, v0: np.ndarray):
             useful_mass_fraction[i, j] = launch_circular(angle, vel)
 
     return useful_mass_fraction
+
+
+def optimize_mass_ratio(gamma: np.ndarray, v0: np.ndarray, Isp: float = 300, plot_mass_ratio: bool = False):
+    # Initialize arrays to save solution
+    mass_ratio = np.zeros((len(gamma), len(v0)))
+
+    # Start simulation
+    optim_v = np.zeros(len(gamma))
+    min_mr = np.zeros(len(gamma))
+    for i in tqdm(range(len(gamma))):
+        angle = gamma[i]
+        for j, vel in enumerate(v0):
+            mass_ratio[i, j] = launch_circular(angle, vel, Isp=Isp, return_mass_ratio=True)
+
+        if np.isnan(mass_ratio[i,:]).all():
+            optim_v[i] = np.nan
+            min_mr[i] = np.nan
+        else:
+            min_mr[i] = np.nanmin(mass_ratio[i, :])
+            optim_v[i] = v0[np.where(mass_ratio[i, :] == min_mr[i])[0][0]]
+
+    if plot_mass_ratio:
+        height, width = mass_ratio.shape
+        repeat_factor = height // width
+        stretched_mass_ratio = np.repeat(mass_ratio, repeat_factor, axis=1)
+        stretched_mass_ratio = stretched_mass_ratio[:, :90]
+
+        plt.imshow(stretched_mass_ratio)
+        cbar = plt.colorbar()
+        cbar.set_label('Mass ratio')
+
+        plt.xticks(ticks=np.arange(0 + int(repeat_factor / 2), len(stretched_mass_ratio[0]), 2 * repeat_factor), labels=np.array(np.round(v0[::2]), dtype=int))
+        plt.yticks(ticks=np.arange(0, len(gamma), 5), labels=np.array(np.round(np.degrees(gamma[::5])), dtype=int))
+
+        plt.xlabel('Initial velocity [m/s]')
+        plt.ylabel('Launch angle [deg]')
+        plt.show()
+
+    return min_mr, optim_v
+
 
 
 if __name__ == '__main__':

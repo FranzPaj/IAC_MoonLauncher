@@ -1,10 +1,11 @@
-from pycode.HelperFunctions import Orbit, Transfer, DirectPlanetTransfer
+from OrbitalDynamics.pycode.HelperFunctions import Orbit, Transfer, DirectPlanetTransfer, LaunchTrajectory
 from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import time
 from tudatpy import constants
+from tqdm import tqdm
 
 ###########################################################################
 # TEST FUNCTIONS ##########################################################
@@ -48,15 +49,64 @@ def hohmann_test():
 
     return
 
+
+def moon_launch_optim(plot: bool = False, return_params: bool = False):
+    launch_angle = np.radians(np.arange(1, 90, .5))
+    initial_v = 1.5e3
+    launch_params = []
+    delta_v = []
+    for angle in tqdm(launch_angle):
+        # Define inital orbit
+        launch_trajectory = LaunchTrajectory('Moon', initial_velocity=initial_v, launch_angle=angle)
+
+        # Calculate minimum velocity and update
+        vel = launch_trajectory.get_initial_velocity_for_altitude(100e3)
+        launch_trajectory.reinitialize_paramters(angle, vel)
+
+        # Store results
+        delta_v.append(launch_trajectory.get_deltav_for_circularization())
+        launch_params.append([angle, vel])
+
+    if plot:
+        plt.plot(np.degrees(launch_angle), delta_v)
+        plt.xlabel('Launch angle [deg]')
+        plt.ylabel('DeltaV [m/s]')
+        plt.show()
+
+    return np.array(delta_v) if not return_params else np.array(delta_v), np.array(launch_params)
+
+
 if __name__ == '__main__':
-
     #### Test for direct Hohmann transfer
-
-    hohmann_test()
+    # hohmann_test()
 
     #### Test for Lambert Targeter
+    # lambert_test()
 
-    lambert_test()
+    #### Moon launch optimization
+    deltaV, launch_params = moon_launch_optim(return_params=True)
+
+    # Launch parameter results
+    angle, velocity = np.array(launch_params).T
+    plt.plot(np.degrees(angle), velocity)
+    plt.xlabel('Launch angle [deg]')
+    plt.ylabel('Initial velocity [m/s]')
+    plt.title('Initial velocity vs Launch angle for Moon launch')
+    plt.show()
+
+    # Mass ratio results
+    deltaV = np.array(deltaV)
+    baseline_ratio = np.exp(1.8e3 / (300 * 9.81)) - 1
+    alternative_ratio = np.exp(deltaV / (300 * 9.81)) - 1
+    print('Baseline ratio:', baseline_ratio)
+
+    plt.plot(np.arange(1, 90, .5), alternative_ratio, label='alternative')
+    plt.axhline(y=baseline_ratio, color='r', linestyle='--', label='baseline')
+    plt.xlabel('Launch angle [deg]')
+    plt.ylabel('Mass ratio')
+    plt.title('Mp / (Mu + Mc) vs Launch angle for Isp = 300s')
+    plt.legend()
+    plt.show()
 
 
 

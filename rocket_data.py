@@ -22,9 +22,9 @@ def calculate_fuel_mass(rocket_data: dict, transfer: Transfer, deltaV_override: 
     return rocket_data['propellant_mass'] - prop_mass
 
 
-# Falcon 9 v1.2 data - second stage
+# Falcon 9 v1.2 and Falcon heavy's data - second stage
 # Retrieved from https://sma.nasa.gov/LaunchVehicle/assets/spacex-falcon-9-v1.2-data-sheet.pdf
-Falcon9_v12 = {
+Falcon_v12 = {
     'empty_mass': 4.5e3,  # kg
     'propellant_mass': 111.5e3,  # kg
     'thrust': 934e3,  # N
@@ -34,42 +34,54 @@ Falcon9_v12 = {
     'payload_V': 16 * np.pi * 1.83**2  # m^3
 }
 
+Falcon_Heavy = {  # From https://www.wevolver.com/specs/falcon-heavy-block-5
+    'empty_mass': 22200,  # kg
+    'propellant_mass': 433100 - 22200,  # kg
+    'thrust': 24681e3,  # N - With boosters
+    'Isp': 311,  # s
+    'burn_time': 187,  # s
+    'OF_ratio': 2.56,  # oxidizer to fuel ratio
+}
 
 if __name__ == '__main__':
-    dV = np.linspace(0, 10e3, 1000)
-    fuel_mass = calculate_fuel_mass(Falcon9_v12, None, dV)
-    ox_mass = Falcon9_v12['OF_ratio'] * fuel_mass
+    # dV = np.linspace(0, 10e3, 1000)
+    # fuel_mass = calculate_fuel_mass(Falcon_v12, None, dV)
+    # ox_mass = Falcon_v12['OF_ratio'] * fuel_mass
+    #
+    # prop_mass_ratio = (fuel_mass + ox_mass) / Falcon_v12['propellant_mass']
+    # # prop_mass_ratio[np.where(prop_mass_ratio > 1)] = 1
+    #
+    # full_refueling = dV[np.where(prop_mass_ratio < 1)[0][0]]
+    #
+    # no_refueling = np.where(prop_mass_ratio <= 0)[0][0]
+    # dV = dV[:no_refueling]
+    # prop_mass_ratio = prop_mass_ratio[:no_refueling]
+    #
+    # # Plot results
+    # plt.plot(dV / 1e3, prop_mass_ratio * 100)
+    # plt.vlines(full_refueling / 1e3, 0, 100, color='black', linestyle='--',
+    #            label='100% refueling')
+    #
+    # plt.title('Payload density = 50 kg/m3')
+    # plt.xlabel('Delta-V [km/s]')
+    # plt.ylabel('Refueling capacity [%]')
+    # plt.legend()
+    # plt.show()
 
-    prop_mass_ratio = (fuel_mass + ox_mass) / Falcon9_v12['propellant_mass']
-    # prop_mass_ratio[np.where(prop_mass_ratio > 1)] = 1
-
-    full_refueling = dV[np.where(prop_mass_ratio < 1)[0][0]]
-
-    no_refueling = np.where(prop_mass_ratio <= 0)[0][0]
-    dV = dV[:no_refueling]
-    prop_mass_ratio = prop_mass_ratio[:no_refueling]
-
-    # Plot results
-    plt.plot(dV / 1e3, prop_mass_ratio * 100)
-    plt.vlines(full_refueling / 1e3, 0, 100, color='black', linestyle='--',
-               label='100% refueling')
-
-    plt.title('Payload density = 50 kg/m3')
-    plt.xlabel('Delta-V [km/s]')
-    plt.ylabel('Refueling capacity [%]')
-    plt.legend()
-    plt.show()
-
-    # Analytic use case
-    print('Moon refueling case')
-    Earth_parking = Orbit('Earth', 300e3 + average_radius_dict['Earth'], 0)
+    # parking orbit altitude needed to be able to refuel completely
     Moon_parking = Orbit('Moon', 100e3 + average_radius_dict['Moon'], 0)
-    direct_transfer = Transfer(Earth_parking, Moon_parking, 'Earth')
 
-    fuel_mass = calculate_fuel_mass(Falcon9_v12, direct_transfer)
-    ox_mass = Falcon9_v12['OF_ratio'] * fuel_mass
+    refueling = 0
+    h = 300e3
+    while refueling < 1:
+        h += 10e3
+        Earth_parking = Orbit('Earth', h + average_radius_dict['Earth'], 0)
+        direct_transfer = Transfer(Earth_parking, Moon_parking, 'Earth')
 
-    prop_mass = fuel_mass + ox_mass
-    print('Propellant mass after re-loading = ', prop_mass/Falcon9_v12['propellant_mass']*100, '%')
-    print('Max delta-v achievable: ', Falcon9_v12['Isp'] * 9.81 * np.log((Falcon9_v12['empty_mass'] + prop_mass)
-                                                                         / Falcon9_v12['empty_mass']), 'm/s')
+        fuel_mass = calculate_fuel_mass(Falcon_v12, direct_transfer)
+        ox_mass = Falcon_v12['OF_ratio'] * fuel_mass
+
+        prop_mass = fuel_mass + ox_mass
+        refueling = prop_mass/Falcon_v12['propellant_mass']
+
+    print(h)
