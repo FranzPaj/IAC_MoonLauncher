@@ -348,23 +348,27 @@ def optimize_mass_ratio(gamma: np.ndarray, v0: np.ndarray, Isp: float = 300, plo
 
     if plot_mass_ratio:
         height, width = mass_ratio.shape
-        repeat_factor = height // width
-        stretched_mass_ratio = np.repeat(mass_ratio, repeat_factor, axis=1)
-        stretched_mass_ratio = stretched_mass_ratio[:, :90]
+        if height > width:
+            repeat_factor = height // width
+            stretched_mass_ratio = np.repeat(mass_ratio, repeat_factor, axis=1)
+            stretched_mass_ratio = stretched_mass_ratio[:, :height]
+        else:
+            repeat_factor = width // height
+            stretched_mass_ratio = np.repeat(mass_ratio, repeat_factor, axis=0)
+            stretched_mass_ratio = stretched_mass_ratio[:width, :]
 
         plt.imshow(stretched_mass_ratio)
         cbar = plt.colorbar()
         cbar.set_label('Mass ratio')
 
         plt.xticks(ticks=np.arange(0 + int(repeat_factor / 2), len(stretched_mass_ratio[0]), 2 * repeat_factor), labels=np.array(np.round(v0[::2]), dtype=int))
-        plt.yticks(ticks=np.arange(0, len(gamma), 5), labels=np.array(np.round(np.degrees(gamma[::5])), dtype=int))
+        plt.yticks(ticks=np.arange(0, len(gamma), 5), labels=np.array(np.round(np.degrees(gamma[::5]), 1), dtype=int))
 
         plt.xlabel('Initial velocity [m/s]')
         plt.ylabel('Launch angle [deg]')
         plt.show()
 
     return min_mr, optim_v
-
 
 
 if __name__ == '__main__':
