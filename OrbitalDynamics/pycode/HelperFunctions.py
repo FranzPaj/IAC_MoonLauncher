@@ -6,6 +6,7 @@ Helper functions and classes that may be useful in other programs
 import numpy as np
 from scipy.optimize import fsolve
 from functools import partial
+import yaml
 
 # Tudat imports
 from tudatpy.interface import spice
@@ -158,8 +159,6 @@ class LaunchTrajectory(Orbit):
             return angle[0]
         else:
             raise ValueError('No solution found for the initial launch angle, try a different initial speed')
-
-
 
 
 class Transfer:
@@ -487,6 +486,47 @@ class DirectPlanetTransfer:
         deltav_total = deltav_departure + deltav_capture
 
         return deltav_total
+
+
+class Launcher:
+    '''
+    Reads the yaml data for different launches and initialises a class to wrap the relevant data.
+    '''
+
+    g0 = 9.81
+
+    def __init__(self, fpath):
+
+        with open(fpath, 'r') as f:
+            data = yaml.safe_load(f)
+        
+        self.Isp_1 = data['Isp_1']
+        self.dry_mass_1 = data['dry_mass_1']
+        self.prop_mass_1 = data['prop_mass_1']
+
+        self.Isp_f = data['Isp_f']
+        self.dry_mass_f = data['dry_mass_f']
+        self.prop_mass_f = data['prop_mass_f']
+
+        self.pl_to_leo = data['pl_to_leo']
+        self.periapsis_leo = data['periapsis_leo']
+        self.apoapsis_leo = data['apoapsis_leo']
+
+    def get_available_refuelled_deltav(self, pl_mass):
+
+        mass_0 = self.dry_mass_f + self.prop_mass_f + pl_mass
+        mass_f = self.dry_mass_f + pl_mass
+        deltav = self.Isp_1 * self.g0 * np.log(mass_0 / mass_f)
+
+        return deltav
+    
+    def get_possible_refuelled_pl(self, deltav):
+
+        big_lambda = np.exp(deltav / (self.Isp_f * self.g0))
+        mass_pl = self.prop_mass_f / (big_lambda - 1) - self.dry_mass_f
+
+        return mass_pl
+
 
 
 ###########################################################################

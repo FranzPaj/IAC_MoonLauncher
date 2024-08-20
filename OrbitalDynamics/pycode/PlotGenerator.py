@@ -15,7 +15,7 @@ from matplotlib.ticker import MaxNLocator
 from tudatpy import constants
 
 # Custom imports
-from pycode.CustomConstants import R_M_ADIMENSIONAL, MU_ADIMENSIONAL
+from OrbitalDynamics.pycode.CustomConstants import R_M_ADIMENSIONAL, MU_ADIMENSIONAL
 
 adimensional_moon_position = 1 - MU_ADIMENSIONAL
 
