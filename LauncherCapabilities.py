@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from tudatpy import constants
 
 # Custom imports
-from OrbitalDynamics.pycode.HelperFunctions import DirectPlanetTransfer, Launcher, average_radius_dict
+from OrbitalDynamics.pycode.HelperFunctions import DirectPlanetTransfer, DirectLunarTransfer, Launcher, average_radius_dict
 from OrbitalDynamics.pycode import PlotGenerator as PlotGen
 
 # Get path of current directory
@@ -74,16 +74,12 @@ if __name__ == '__main__':
     print('Minimum DeltaV needed for Mars transfer')
     print('Earth:', min_deltav_earth/1000, 'km/s', '| Moon:', min_deltav_moon/1000, 'km/s')
 
-    # TEMP
-    deltav_needed = min_deltav_moon + deltav_for_lunar_ascent
-    big_lambda = np.exp(deltav_needed / (starship.Isp_f * starship.g0))
-    mass_pl_moon_launch = starship.prop_mass_f / (big_lambda - 1) - starship.dry_mass_f
-
     starship_possible_refuelled_earth_pl = starship.get_possible_refuelled_pl(min_deltav_earth)
     starship_possible_refuelled_moon_pl = starship.get_possible_refuelled_pl(min_deltav_moon)
+    starship_possible_moon_launch_pl = starship.get_possible_moon_launch_pl(min_deltav_moon + deltav_for_lunar_ascent)
     print('Possible P/L transportable via starship')
     print(f'Earth refuel: {starship_possible_refuelled_earth_pl / 1000:.2f} t | Moon refuel: {starship_possible_refuelled_moon_pl / 1000:.2f} t |' 
-          f' Moon launch: {mass_pl_moon_launch / 1000:.2f} t')
+          f' Moon launch: {starship_possible_moon_launch_pl / 1000:.2f} t')
 
     fig1 = PlotGen.porkchop_plot(departure_time_ls, tof_ls, deltav_matrix_earth)
 
@@ -130,4 +126,23 @@ if __name__ == '__main__':
 
     fig3 = PlotGen.feasibility_comparison(res_dict)
 
-    plt.show()
+    # plt.show()
+
+
+    ###########################################################################
+    # CHECK TRANSFER CAPABILITIES TO MOON #####################################
+    ###########################################################################
+
+    transfer = DirectLunarTransfer()
+    sma_dep_earth = average_radius_dict['Earth'] + 200e3  # A 200 km altitude departure orbit
+    ecc_dep_earth = 0
+    sma_arr_moon = average_radius_dict['Moon'] + 100e3  # A 100 km altitude Moon arrival orbit
+    ecc_arr_moon = 0
+
+    deltav_moon_transfer = transfer.get_transfer_deltav(sma_dep_earth, ecc_dep_earth, sma_arr_moon, ecc_arr_moon)
+
+    
+    big_lambda = np.exp(deltav_moon_transfer / (starship.Isp_f * starship.g0))
+    pl_to_moon = starship.prop_mass_f / (big_lambda - 1) - starship.dry_mass_f
+
+    print(f'P/L that a refuelled Starship can transport to LLO: {pl_to_moon/1000:.2f} t')

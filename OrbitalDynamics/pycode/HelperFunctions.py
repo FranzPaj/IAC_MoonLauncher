@@ -488,6 +488,43 @@ class DirectPlanetTransfer:
         return deltav_total
 
 
+class DirectLunarTransfer:
+
+    def __init__(self):
+
+        self.mu_earth = gravitational_param_dict['Earth']
+        self.mu_moon = gravitational_param_dict['Moon']
+        self.sma_moon = sma_dict['Moon']
+
+    def get_transfer_deltav(self, sma_earth_orbit, ecc_earth_orbit, sma_moon_orbit, ecc_moon_orbit):
+
+        # Get velocity at Earth periapsis
+        rp_earth = sma_earth_orbit * (1 - ecc_earth_orbit)  # Periapsis radius
+        vp0_earth = np.sqrt(self.mu_earth * (2 / rp_earth - 1 / sma_earth_orbit))  # Initial velocity at periselene
+        # Get needed velocity for translunar trajectory
+        sma_transfer = self.sma_moon + rp_earth
+        vp_needed = np.sqrt(self.mu_earth * (2 / rp_earth - 1 / sma_transfer))
+        # Calculate DeltaV at Earth
+        deltav_needed_earth = vp_needed - vp0_earth
+        
+        # Get arrival hyperbolic velocity
+        ra_transfer = sma_transfer * (1 + ecc_earth_orbit)  # Apoapsis radius
+        va_transfer = np.sqrt(self.mu_earth * (2 / ra_transfer - 1 / sma_transfer))
+        v_moon = np.sqrt(self.mu_earth / self.sma_moon)
+        v_hyp = va_transfer - v_moon
+
+        # Get velocity at Moon periselene
+        rp_moon = sma_moon_orbit * (1 - ecc_moon_orbit)  # Target periapsis radius
+        vp0_moon = np.sqrt(self.mu_moon * (2 / rp_moon - 1 / sma_moon_orbit))  # Target velocity at periselene
+        vp_arr_moon = np.sqrt(v_hyp**2 + 2 * self.mu_moon / rp_moon)  # Needed velocity at pericenter for departure
+        deltav_needed_moon = vp_arr_moon - vp0_moon
+
+        # Get total deltav
+        deltav_tot = deltav_needed_earth + deltav_needed_moon
+
+        return deltav_tot
+
+
 class Launcher:
     '''
     Reads the yaml data for different launches and initialises a class to wrap the relevant data.
@@ -527,6 +564,13 @@ class Launcher:
         return deltav
     
     def get_possible_refuelled_pl(self, deltav):
+
+        big_lambda = np.exp(deltav / (self.Isp_f * self.g0))
+        mass_pl = self.prop_mass_f / (big_lambda - 1) - self.dry_mass_f
+
+        return mass_pl
+    
+    def get_possible_moon_launch_pl(self, deltav):
 
         big_lambda = np.exp(deltav / (self.Isp_f * self.g0))
         mass_pl = self.prop_mass_f / (big_lambda - 1) - self.dry_mass_f
