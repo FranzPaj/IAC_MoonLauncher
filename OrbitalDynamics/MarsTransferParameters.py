@@ -10,7 +10,7 @@ import os
 from tudatpy import constants
 
 # Custom imports
-from pycode.HelperFunctions import DirectPlanetTransfer
+from OrbitalDynamics.pycode.HelperFunctions import DirectPlanetTransfer
 
 
 # Get path of current directory
@@ -20,7 +20,7 @@ except NameError:
     current_dir = os.getcwd()
 
 
-if __name__ == '__main__':
+def parameters_calculator():
 
     ###########################################################################
     # GET PORKCHOP DATA #######################################################
@@ -55,7 +55,7 @@ if __name__ == '__main__':
         # Get the option-specific DeltaV
         match option:
             case 'earth_launch':
-                earth_sma_dep = (6371 + 300) * 10 ** 3 
+                earth_sma_dep = (6371 + 200) * 10 ** 3 
                 earth_ecc_dep = 0
                 # Get the DeltaV
                 deltav_matrix = np.zeros((len(tof_ls), len(departure_time_ls)))
@@ -86,6 +86,7 @@ if __name__ == '__main__':
     # ToF
     output_path = os.path.join(current_dir, 'output', 'mars_transfer', 'tof_range.txt')
     np.savetxt(output_path, tof_ls)
+
 
 
 

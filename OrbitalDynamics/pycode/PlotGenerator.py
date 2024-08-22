@@ -578,7 +578,7 @@ def feasibility_comparison(res_dict: dict) -> plt.figure:
         levels = [deltav_cutoff]
         color = case_dict['color']
         linestyle = case_dict['linestyle']
-        label = case_dict['label'] + rf' - $\Delta V_{{max}} = {deltav_cutoff}$ km/s'
+        label = case_dict['label'] + rf' - $\Delta V_{{max}} = {deltav_cutoff:.2f}$ km/s'
 
         legend_entry = Line2D([0], [0], label=label, color=color, linestyle=linestyle)
         handles.append(legend_entry)

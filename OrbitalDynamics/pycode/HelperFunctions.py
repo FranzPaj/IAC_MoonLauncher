@@ -503,14 +503,20 @@ class Launcher:
         self.Isp_1 = data['Isp_1']
         self.dry_mass_1 = data['dry_mass_1']
         self.prop_mass_1 = data['prop_mass_1']
+        self.tot_mass_1 = self.dry_mass_1 + self.prop_mass_1
 
         self.Isp_f = data['Isp_f']
         self.dry_mass_f = data['dry_mass_f']
         self.prop_mass_f = data['prop_mass_f']
+        self.tot_mass_f = self.dry_mass_f + self.prop_mass_f
+        self.thrust_f = data['thrust_f']
 
         self.pl_to_leo = data['pl_to_leo']
-        self.periapsis_leo = data['periapsis_leo']
-        self.apoapsis_leo = data['apoapsis_leo']
+        earth_radius = average_radius_dict['Earth']
+        self.periapsis_leo = data['periapsis_leo'] + earth_radius
+        self.apoapsis_leo = data['apoapsis_leo'] + earth_radius
+        # Calculate the DeltaV needed to reach the nominal orbit with the reference mission
+        self.deltav_nom_1, self.deltav_nom_f, self.deltav_nom = self.get_deltav_nom()
 
     def get_available_refuelled_deltav(self, pl_mass):
 
@@ -526,6 +532,35 @@ class Launcher:
         mass_pl = self.prop_mass_f / (big_lambda - 1) - self.dry_mass_f
 
         return mass_pl
+    
+    def get_deltav_nom(self):
+
+        mass_i1 = self.pl_to_leo + self.tot_mass_1 + self.tot_mass_f
+        mass_f1 = self.pl_to_leo + self.dry_mass_1 + self.tot_mass_f
+        deltav_1 = self.Isp_1 * self.g0 * np.log(mass_i1 / mass_f1)
+
+        mass_i2 = self.pl_to_leo + self.tot_mass_f
+        mass_f2 = self.pl_to_leo + self.dry_mass_f
+        deltav_2 = self.Isp_f * self.g0 * np.log(mass_i2 / mass_f2)
+
+        deltav_nom = deltav_1 + deltav_2
+
+        return deltav_1, deltav_2, deltav_nom
+    
+    def get_available_earth_launch_deltav(self, pl_mass):
+
+        mass_i1 = pl_mass + self.tot_mass_1 + self.tot_mass_f
+        mass_f1 = pl_mass + self.dry_mass_1 + self.tot_mass_f
+        deltav_1 = self.Isp_1 * self.g0 * np.log(mass_i1 / mass_f1)
+
+        mass_i2 = pl_mass + self.tot_mass_f
+        mass_f2 = pl_mass + self.dry_mass_f
+        deltav_2 = self.Isp_f * self.g0 * np.log(mass_i2 / mass_f2)
+
+        available_deltav = deltav_1 + deltav_2 - self.deltav_nom 
+
+        return available_deltav
+
 
 
 

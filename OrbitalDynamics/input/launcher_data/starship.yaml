@@ -11,6 +11,7 @@ prop_mass_1: 3400000  # kg
 Isp_f: 374  # s
 dry_mass_f: 130000  # kg
 prop_mass_f: 1200000  # kg
+thrust_f: 11682000  # N
 
 # Orbital profile data
 pl_to_leo: 204000  # In expendable mode - kg
