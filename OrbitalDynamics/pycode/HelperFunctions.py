@@ -563,14 +563,14 @@ class Launcher:
 
         return deltav
     
-    def get_possible_refuelled_pl(self, deltav):
+    def get_mars_possible_refuelled_pl(self, deltav):
 
         big_lambda = np.exp(deltav / (self.Isp_f * self.g0))
         mass_pl = self.prop_mass_f / (big_lambda - 1) - self.dry_mass_f
 
         return mass_pl
     
-    def get_possible_moon_launch_pl(self, deltav):
+    def get_mars_possible_moon_launch_pl(self, deltav):
 
         big_lambda = np.exp(deltav / (self.Isp_f * self.g0))
         mass_pl = self.prop_mass_f / (big_lambda - 1) - self.dry_mass_f
@@ -606,7 +606,47 @@ class Launcher:
         return available_deltav
 
 
+class FarPlanetTransfer:
 
+    def __init__(self, c3):
+
+        self.mu_earth = gravitational_param_dict['Earth']
+        self.mu_moon = gravitational_param_dict['Moon']
+        self.sma_moon = sma_dict['Moon']
+
+        self.vinf = np.sqrt(c3)
+
+    def get_earth_departure_deltav(self, sma_dep, ecc_dep):
+
+        # Parameters of the parking Moon orbit
+        rp = sma_dep * (1 - ecc_dep)  # Pericenter radius
+        vp_0 = np.sqrt(self.mu_earth * (2 / rp - 1 / sma_dep))  # Initial velocity at pericenter
+        vp_needed = np.sqrt(self.vinf**2 + 2 * self.mu_earth / rp)  # Needed velocity at pericenter for departure
+        deltav = vp_needed - vp_0
+
+        return deltav
+    
+    def get_moon_departure_deltav(self, sma_dep, ecc_dep):
+
+        moon_vel = np.sqrt(self.mu_earth / self.sma_moon)
+        # Get magnitude of velocity vector when leaving the Moon SoI
+        vel_departing_moon_soi = np.sqrt(self.vinf**2 + 2 * self.mu_earth / self.sma_moon)  # Hyperbolic velocity magnitude at Moon's SoI in Earth frame
+        # Get Moon-centered excess velocity
+        excess_vel_moon = vel_departing_moon_soi - moon_vel  # Excess velocity in the Moon reference frame
+
+        if debug_flag:
+            print('Moon velocity:', moon_vel)
+            print('Velocity at SoI:', vel_departing_moon_soi)
+            print('Arrival excess velocity at Moon SoI:', excess_vel_moon)
+
+        # Parameters of the parking Moon orbit
+        rp = sma_dep * (1 - ecc_dep)  # Periselene radius
+        vp_0 = np.sqrt(self.mu_moon * (2 / rp - 1 / sma_dep))  # Initial velocity at periselene
+        vp_needed = np.sqrt(excess_vel_moon**2 + 2 * self.mu_moon / rp)  # Needed velocity at periselene for departure
+        deltav = vp_needed - vp_0 
+
+        return deltav
+    
 
 ###########################################################################
 # CUSTOM FUNCTIONS ########################################################

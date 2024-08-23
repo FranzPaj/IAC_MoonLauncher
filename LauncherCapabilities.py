@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from tudatpy import constants
 
 # Custom imports
-from OrbitalDynamics.pycode.HelperFunctions import DirectPlanetTransfer, DirectLunarTransfer, Launcher, average_radius_dict
+from OrbitalDynamics.pycode.HelperFunctions import DirectPlanetTransfer, DirectLunarTransfer, FarPlanetTransfer, Launcher, average_radius_dict
 from OrbitalDynamics.pycode import PlotGenerator as PlotGen
 
 # Get path of current directory
@@ -74,9 +74,9 @@ if __name__ == '__main__':
     print('Minimum DeltaV needed for Mars transfer')
     print('Earth:', min_deltav_earth/1000, 'km/s', '| Moon:', min_deltav_moon/1000, 'km/s')
 
-    starship_possible_refuelled_earth_pl = starship.get_possible_refuelled_pl(min_deltav_earth)
-    starship_possible_refuelled_moon_pl = starship.get_possible_refuelled_pl(min_deltav_moon)
-    starship_possible_moon_launch_pl = starship.get_possible_moon_launch_pl(min_deltav_moon + deltav_for_lunar_ascent)
+    starship_possible_refuelled_earth_pl = starship.get_mars_possible_refuelled_pl(min_deltav_earth)
+    starship_possible_refuelled_moon_pl = starship.get_mars_possible_refuelled_pl(min_deltav_moon)
+    starship_possible_moon_launch_pl = starship.get_mars_possible_moon_launch_pl(min_deltav_moon + deltav_for_lunar_ascent)
     print('Possible P/L transportable via starship')
     print(f'Earth refuel: {starship_possible_refuelled_earth_pl / 1000:.2f} t | Moon refuel: {starship_possible_refuelled_moon_pl / 1000:.2f} t |' 
           f' Moon launch: {starship_possible_moon_launch_pl / 1000:.2f} t')
@@ -196,12 +196,44 @@ if __name__ == '__main__':
 
     print(f'Biggest Payload to Mars if oxydant needs to be brought as well: {best_pl / 1000:.2f} t')
 
-    plt.plot(pl_ls/1000, oxy_ls/1000)
-    plt.show()
-    plt.plot(pl_ls/1000, fuel_supply_needed_ls/1000)
-    plt.show()
+    # plt.plot(pl_ls/1000, oxy_ls/1000)
+    # plt.show()
+    # plt.plot(pl_ls/1000, fuel_supply_needed_ls/1000)
+    # plt.show()
 
 
     ###########################################################################
-    # HANDLE REFUELING WITH LIMITED OXIDANT ###################################
+    # MASS ESTIMATION FOR PAYLOAD DIRECTLY LAUNCHED WITH ALT METHODS ##########
     ###########################################################################
+
+    nom_pl = 4e3  # kg
+    epsilon = 0.05  # Construction ratio
+    deltav = min_deltav_moon + 800
+    exp_fact = np.exp(deltav / c)
+    prop_mass = nom_pl * (exp_fact - 1) / (1 / (1 - epsilon) - epsilon / (1 - epsilon) * exp_fact)
+
+    mass_to_be_yeeted = prop_mass * epsilon / (1 - epsilon) + prop_mass + nom_pl
+    print(f'Approximate mass to be yeeted to LLO for a 4 t mission to Mars: {mass_to_be_yeeted/1000:.2f} t')
+
+
+    ###########################################################################
+    # URANUS CASE STUDY #######################################################
+    ###########################################################################
+
+    print('----------------------------------------------------------------------------')
+    print('Uranus case study')
+
+    # Get Moon DeltaV for given Vinf
+    c3 = 12.04 * 10**6  # m^2/s^2
+    transfer = FarPlanetTransfer(c3)
+    sma_earth_dep = average_radius_dict['Earth'] + 200e3  # 200 km altitude orbit - m
+    ecc_earth_dep = 0
+    deltav_uranus_from_earth = transfer.get_earth_departure_deltav(sma_earth_dep, ecc_earth_dep)
+    sma_moon_dep = average_radius_dict['Moon'] + 100e3  # 100 km altitude orbit - m
+    ecc_moon_dep = 0
+    deltav_uranus_from_moon = transfer.get_moon_departure_deltav(sma_moon_dep, ecc_moon_dep)
+
+    print('DeltaV needed for Uranus transfer:')
+    print(f'Earth: {deltav_uranus_from_earth/1000:.2f} km/s | Moon: {deltav_uranus_from_moon/1000:.2f} km/s')
+
+
