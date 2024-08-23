@@ -127,6 +127,10 @@ if __name__ == '__main__':
     fig3 = PlotGen.feasibility_comparison(res_dict)
 
     # plt.show()
+    plt.close(fig1)
+    plt.close(fig2)
+    plt.close(fig3)
+
 
 
     ###########################################################################
@@ -146,3 +150,58 @@ if __name__ == '__main__':
     pl_to_moon = starship.prop_mass_f / (big_lambda - 1) - starship.dry_mass_f
 
     print(f'P/L that a refuelled Starship can transport to LLO: {pl_to_moon/1000:.2f} t')
+
+
+    ###########################################################################
+    # HANDLE REFUELING WITH LIMITED OXIDANT ###################################
+    ###########################################################################
+
+    num_points = 550
+    pl_ls = np.linspace(1e3, 550e3, num_points)  # Cover the 1t - 550t interval with a 1t density
+    oxy_ls = np.zeros(num_points)
+    oxy_ls[:] = np.nan
+    fuel_supply_needed_ls = np.zeros(num_points)
+    frac_ls = np.zeros(num_points)
+
+    o2_to_ch4_mass_ratio = 4
+
+    # Data needed
+    liq = starship.prop_mass_f
+    dry = starship.dry_mass_f
+    c = starship.Isp_f * starship.g0
+    exp_fact_1 = np.exp(deltav_moon_transfer / c)
+    exp_fact_2 = np.exp(min_deltav_moon / c)
+
+    best_pl = 0
+
+    for index, pl in enumerate(pl_ls):
+
+        coeff_mat = np.array([[liq * exp_fact_1, exp_fact_1 - 1], [liq, (1 + o2_to_ch4_mass_ratio)]])
+        val = np.array([liq - (dry + pl) * (exp_fact_1 - 1), (dry + pl) * (exp_fact_2 - 1)])
+        sol = np.linalg.solve(coeff_mat, val)
+        remaining_prop_mass_fract = sol[0]
+        oxy_mass = sol[1]
+
+        if oxy_mass < 0:
+            oxy_mass = 0
+            
+        if remaining_prop_mass_fract < 0:
+            oxy_mass = np.nan
+        else:
+            best_pl = pl
+
+        oxy_ls[index] = oxy_mass
+        frac_ls[index] = remaining_prop_mass_fract
+        fuel_supply_needed_ls[index] = 4 * oxy_mass
+
+    print(f'Biggest Payload to Mars if oxydant needs to be brought as well: {best_pl / 1000:.2f} t')
+
+    plt.plot(pl_ls/1000, oxy_ls/1000)
+    plt.show()
+    plt.plot(pl_ls/1000, fuel_supply_needed_ls/1000)
+    plt.show()
+
+
+    ###########################################################################
+    # HANDLE REFUELING WITH LIMITED OXIDANT ###################################
+    ###########################################################################
