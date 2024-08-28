@@ -18,33 +18,6 @@ if __name__ == '__main__':
     deltaV_maglev, launch_params_maglev = moon_launch_optim(return_params=True)
     maglev_ratio = np.exp(deltaV_maglev / (Isp * 9.81)) - 1
 
-    # Plot maglev
-    fig, ax1 = plt.subplots(figsize=(12, 6))
-
-    # Mass ratio
-    ax1.plot(np.degrees(launch_params_maglev[:, 0]), maglev_ratio,
-             label='Mass Ratio', color='tab:blue')
-    ax1.set_xlabel('Launch Angle [deg]', fontsize=14)
-    ax1.set_ylabel('Mass ratio [-]', fontsize=14, color='tab:blue')
-    ax1.tick_params(axis='y', labelcolor='tab:blue', labelsize=12)
-    ax1.tick_params(axis='x', labelsize=12)
-
-    # Velocity
-    ax2 = ax1.twinx()
-    ax2.plot(np.degrees(launch_params_maglev[:, 0]), launch_params_maglev[:, 1],
-             label=r'V$_0$', color='tab:red', linestyle='--')
-    ax2.set_ylabel('Initial velocity [-]', fontsize=14, color='tab:red')
-    ax2.tick_params(axis='y', labelcolor='tab:red', labelsize=12)
-    ax2.tick_params(axis='x', labelsize=12)
-
-    # Formatting
-    ax1.grid(True)
-
-    fig.legend(bbox_to_anchor=(0.9, 0.575), fontsize=12)
-    fig.tight_layout()
-    plt.savefig('Plots\\maglev_mass_ratio_and_v.pdf')
-    plt.show()
-
     ### SpinLaunch
     gamma = np.radians(np.arange(0.5, 90, 0.5))
     v0 = np.linspace(200, 2000, len(gamma) + 1)
@@ -101,8 +74,8 @@ if __name__ == '__main__':
 
     ax.plot(np.searchsorted(gamma, launch_params_maglev[:, 0]) * 2,
             np.searchsorted(v0, launch_params_maglev[:, 1]),
-            color='lime', linestyle='dashdot', label='Case 1 opt')
-    ax.plot(np.arange(len(min_ratio)), min_ratio, 'r--', label='Case 2 opt')
+            color='tab:red', linestyle='--', label='Case 1 opt')
+    ax.plot(np.arange(len(min_ratio)), min_ratio, color='tab:red', linestyle='-', label='Case 2 opt')
     ax.grid(True)
 
     fig.legend(bbox_to_anchor=(0.3, 0.31), fontsize=12)
@@ -110,20 +83,66 @@ if __name__ == '__main__':
     plt.savefig('Plots\\spinLaunch_mass_ratio.pdf')
     plt.show()
 
-    ## Mass ratio comparisson
+    ## Optimum and minimum velocities and their corresponding ratios
+    first_non_nan_indices = np.full(mass_ratio_T.shape[1], np.nan)
+
+    # Iterate over each column to find the first non-NaN value
+    ratio_min_v = []
+    min_v = []
+    for col in range(mass_ratio_T.shape[1]):
+        non_nan_indices = np.where(~np.isnan(mass_ratio_T[:, col]))[0]
+        if non_nan_indices.size > 0:
+            first_non_nan_indices[col] = int(non_nan_indices[0])
+            ratio_min_v.append(mass_ratio_T[int(non_nan_indices[0]), col])
+            min_v.append(v0[int(non_nan_indices[0])])
+
+    # Plot ratios
     fig, ax = plt.subplots(figsize=(12, 6))
 
+    # Maglev params
     ax.plot(np.degrees(launch_params_maglev[:, 0]), maglev_ratio,
-            color='tab:blue', linestyle='-', label='Case 1')
+            label=r'Case 1 opt', color='tab:blue', linestyle='-')
+
+    # SpinLaunch params
     ax.plot(np.degrees(gamma), np.nanmin(mass_ratio, axis=1),
-            color='tab:orange', linestyle='--', label='Case 2 opt')
+            label='Case 2 opt', color='tab:blue', linestyle='--')
 
-    ax.tick_params(axis='both', labelsize=12)
-    plt.xlabel('Launch angle [deg]', fontsize=14)
-    plt.ylabel('Mass ratio [-]', fontsize=14)
+    # Minimum params
+    ax.plot(np.degrees(gamma), ratio_min_v, label='Minimum', color='tab:blue', linestyle=':')
 
-    plt.legend(prop={'size': 12})
-    plt.grid(True)
+    ax.set_xlabel('Launch angle [deg]', fontsize=14)
+    ax.set_ylabel('Mass ratio [-]', fontsize=14)
+    ax.tick_params(axis='x', labelsize=12)
+    ax.tick_params(axis='y', labelsize=12)
 
-    plt.savefig('Plots\\Opt_mass_ratio_overview.pdf')
+    ax.grid(True)
+    ax.legend(bbox_to_anchor=(0.64, 0.945), fontsize=12)
+
+    plt.savefig('Plots\\Opt_and_min_ratios.pdf')
+    plt.show()
+
+    # Plot velocities
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # Maglev params
+    ax.plot(np.degrees(launch_params_maglev[:, 0]), launch_params_maglev[:, 1],
+            label=r'Case 1 opt', color='tab:red', linestyle='-')
+
+    # SpinLaunch params
+    ax.plot(np.degrees(gamma), v0[np.nanargmin(mass_ratio, axis=1)],
+            label='Case 2 opt', color='tab:red', linestyle='--')
+
+    # Minimum params
+    ax.plot(np.degrees(gamma), min_v, label='Minimum', color='tab:red', linestyle=':')
+
+    ax.set_xlabel('Launch angle [deg]', fontsize=14)
+    ax.set_ylabel('Initial velocity [m/s]', fontsize=14)
+
+    ax.tick_params(axis='x', labelsize=12)
+    ax.tick_params(axis='y', labelsize=12)
+
+    ax.grid(True)
+    ax.legend(fontsize=12)
+
+    plt.savefig('Plots\\Opt_and_min_velocities.pdf')
     plt.show()

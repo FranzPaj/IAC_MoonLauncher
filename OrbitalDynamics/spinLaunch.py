@@ -127,7 +127,8 @@ def launch_circular(gamma0, v0,
            construction_ratio: float = 0.1,
            mass: float = 1000,
            thrust: float = 1000,
-           return_mass_ratio: bool = False):
+           return_mass_ratio: bool = False,
+           full_output: bool = False):
     '''
     Function for finding the propellant ratio for which tangency at a given altitude occurs,using a constant thrust gravity turn.
     The solution-searching algorithm searches the ratio interval [0, 1] by bisecting the interval at each passage and verifying
@@ -201,8 +202,10 @@ def launch_circular(gamma0, v0,
         mp_end = mp_pl + mp_leftover - dm_manoeuvre  # Propellant in orbit
 
         if return_mass_ratio:
-            # M_propellant / (M_construction + M_payload)
-            return (mp_initial - mp_end) / (mass * construction_ratio + mp_end)
+            if full_output:
+                return (mp_initial - mp_end) / (mass * construction_ratio + mp_end), mp_end, dm_manoeuvre
+            else:
+                return (mp_initial - mp_end) / (mass * construction_ratio + mp_end)
 
         gr = mp_initial / mp_end  # Gear ratio
 
