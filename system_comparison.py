@@ -109,3 +109,21 @@ if __name__ == '__main__':
     fig.tight_layout()
     plt.savefig('Plots\\spinLaunch_mass_ratio.pdf')
     plt.show()
+
+    ## Mass ratio comparisson
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    ax.plot(np.degrees(launch_params_maglev[:, 0]), maglev_ratio,
+            color='tab:blue', linestyle='-', label='Case 1')
+    ax.plot(np.degrees(gamma), np.nanmin(mass_ratio, axis=1),
+            color='tab:orange', linestyle='--', label='Case 2 opt')
+
+    ax.tick_params(axis='both', labelsize=12)
+    plt.xlabel('Launch angle [deg]', fontsize=14)
+    plt.ylabel('Mass ratio [-]', fontsize=14)
+
+    plt.legend(prop={'size': 12})
+    plt.grid(True)
+
+    plt.savefig('Plots\\Opt_mass_ratio_overview.pdf')
+    plt.show()
