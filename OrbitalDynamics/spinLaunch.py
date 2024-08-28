@@ -5,6 +5,8 @@ import matplotlib
 from tqdm import tqdm
 from OrbitalDynamics.pycode.HelperFunctions import gravitational_param_dict, average_radius_dict
 import warnings
+from scipy.optimize import minimize
+from scipy.interpolate import griddata
 
 ###########################################################################
 # CIRCULAR MOON ###########################################################
@@ -63,8 +65,14 @@ def get_tangency_condition(gamma0, v0, thrust, g, Isp, construction_ratio, m0, r
     # Define parameters for integration
     time_span_orbit = [0, 24 * 3600]  # Dummy time span of 1 day, integration will be done earlier though
     tol = 1.0e-12 # Relative and absolute tolerance for integration
+
     # Define initial state
-    x0 = np.array([r0, theta0, gamma0, v0, mtot0, mp0])
+    if type(v0) is np.ndarray:
+        v = v0[0]
+        x0 = np.array([r0, theta0, gamma0, v, mtot0, mp0])
+    else:
+        x0 = np.array([r0, theta0, gamma0, v0, mtot0, mp0])
+
     # Execute integration
     sol = scipy.integrate.solve_ivp(polar_int_fun, time_span_orbit, x0, method='RK45',
                                 rtol=tol, atol=tol, args=args, events=stop_condition)
@@ -97,7 +105,11 @@ def get_orbit_reaching_condition(gamma0, v0, thrust, g, Isp, construction_ratio,
     time_span_orbit = [0, 24 * 3600]
     tol = 1.0e-12 # Relative and absolute tolerance for integration
     # Define initial state
-    x0 = np.array([r0, theta0, gamma0, v0, mtot0, mp0])
+    if type(v0) is np.ndarray:
+        v = v0[0]
+        x0 = np.array([r0, theta0, gamma0, v, mtot0, mp0])
+    else:
+        x0 = np.array([r0, theta0, gamma0, v0, mtot0, mp0])
     sol = scipy.integrate.solve_ivp(polar_int_fun, time_span_orbit, x0, method='RK45',
                                     rtol=tol, atol=tol, args=args, events=stop_condition)
 
@@ -190,7 +202,7 @@ def launch_circular(gamma0, v0,
 
         if return_mass_ratio:
             # M_propellant / (M_construction + M_payload)
-            return (mp_initial - mp_end) / (mass * construction_ratio + mp_pl)
+            return (mp_initial - mp_end) / (mass * construction_ratio + mp_end)
 
         gr = mp_initial / mp_end  # Gear ratio
 
@@ -314,34 +326,106 @@ def launch_alt(angle, v0,
     return gr
 
 
-def optimize_initial_params(gamma: np.ndarray, v0: np.ndarray):
-    # Initialize arrays to save solution
-    useful_mass_fraction = np.zeros((len(gamma), len(v0)))
+def launch_funct(vel, angle):
+    ratio = launch_circular(angle, vel, return_mass_ratio=True)
+    return ratio
 
-    # Start simulation
+
+def optimize_initial_params():
+    min_v = np.array([1560, 1510, 1480, 1450, 1420, 1400, 1380, 1360, 1340, 1320, 1310, 1290, 1280, 1260, 1250, 1240, 1230,
+                      1220, 1210, 1200, 1190, 1180, 1170, 1160, 1150, 1140, 1140, 1130, 1120, 1120, 1110, 1100, 1100, 1090,
+                      1080, 1080, 1070, 1070, 1060, 1060, 1050, 1040, 1030, 1010, 1000,  990,  980,  970, 960,  950,  940,
+                      920,  910,  900,  890,  880,  870,  860,  850,  840,  830,  820,  820,  810,  800,  790,  780,  770,
+                      760,  760,  750,  740,  730,  720,  720,  710,  700,  700,  690,  680,  680,  670,  660,  660,  650,
+                      640,  640,  630,  630,  620,  620,  610,  610,  600,  600,  590,  590,  580,  580,  570,  570,  560,
+                      560,  550,  550,  540,  540,  540,  530,  530,  520,  520,  520,  510,  510,  510,  500,  500,  490,
+                      490,  490,  480,  480,  480,  480,  470,  470,  470,  460,  460,  460,  450,  450,  450,  450,  440,
+                      440,  440,  440,  430,  430,  430,  430,  420,  420,  420,  420,  410,  410,  410,  410,  410,  400,
+                      400,  400,  400,  390,  390,  390,  390,  390,  380,  380,  380,  380,  380,  370,  370,  370,  370,
+                      370,  360,  360,  360,  360,  350,  350,  350,  340])
+
+    opt_v = []
+    gamma = np.radians(np.arange(0.5, 90, 0.5))
     for i in tqdm(range(len(gamma))):
-        angle = gamma[i]
-        for j, vel in enumerate(v0):
-            useful_mass_fraction[i, j] = launch_circular(angle, vel)
+        v = minimize(launch_funct, min_v[i] + 100, args=(gamma[i],))
+        opt_v.append(v)
 
-    return useful_mass_fraction
+    return opt_v
 
 
-def optimize_mass_ratio(gamma: np.ndarray, v0: np.ndarray, Isp: float = 300, plot_mass_ratio: bool = False):
+def optimize_initial_params_rough():
+    min_v = np.array([1560, 1510, 1480, 1450, 1420, 1400, 1380, 1360, 1340, 1320, 1310, 1290, 1280, 1260, 1250, 1240, 1230,
+                      1220, 1210, 1200, 1190, 1180, 1170, 1160, 1150, 1140, 1140, 1130, 1120, 1120, 1110, 1100, 1100, 1090,
+                      1080, 1080, 1070, 1070, 1060, 1060, 1050, 1040, 1030, 1010, 1000,  990,  980,  970, 960,  950,  940,
+                      920,  910,  900,  890,  880,  870,  860,  850,  840,  830,  820,  820,  810,  800,  790,  780,  770,
+                      760,  760,  750,  740,  730,  720,  720,  710,  700,  700,  690,  680,  680,  670,  660,  660,  650,
+                      640,  640,  630,  630,  620,  620,  610,  610,  600,  600,  590,  590,  580,  580,  570,  570,  560,
+                      560,  550,  550,  540,  540,  540,  530,  530,  520,  520,  520,  510,  510,  510,  500,  500,  490,
+                      490,  490,  480,  480,  480,  480,  470,  470,  470,  460,  460,  460,  450,  450,  450,  450,  440,
+                      440,  440,  440,  430,  430,  430,  430,  420,  420,  420,  420,  410,  410,  410,  410,  410,  400,
+                      400,  400,  400,  390,  390,  390,  390,  390,  380,  380,  380,  380,  380,  370,  370,  370,  370,
+                      370,  360,  360,  360,  360,  350,  350,  350,  340])
+
+    opt_v = []
+    opt_ratio = []
+    gamma = np.radians(np.arange(0.5, 90, 0.5))
+
+    for i in tqdm(range(len(gamma))):
+        previous = 1000
+        v = min_v[i]
+
+        mass_ratio = launch_circular(gamma[i], v, return_mass_ratio=True)
+        while previous > mass_ratio:
+            if np.degrees(gamma[i]) < 20:
+                v += 0.1
+            else:
+                v += 1
+            previous = mass_ratio
+            mass_ratio = launch_circular(gamma[i], v, return_mass_ratio=True)
+
+        opt_v.append(v - 1)
+        opt_ratio.append(previous)
+
+    return opt_v, opt_ratio
+
+
+def optimize_mass_ratio(gamma: np.ndarray,
+                        v0: np.ndarray,
+                        Isp: float = 300,
+                        plot_mass_ratio: bool = False,
+                        run_mass_diagnostics: bool = False):
     # Initialize arrays to save solution
     mass_ratio = np.zeros((len(gamma), len(v0)))
+
+    min_v = np.array(
+        [1560, 1510, 1480, 1450, 1420, 1400, 1380, 1360, 1340, 1320, 1310, 1290, 1280, 1260, 1250, 1240, 1230,
+         1220, 1210, 1200, 1190, 1180, 1170, 1160, 1150, 1140, 1140, 1130, 1120, 1120, 1110, 1100, 1100, 1090,
+         1080, 1080, 1070, 1070, 1060, 1060, 1050, 1040, 1030, 1010, 1000, 990, 980, 970, 960, 950, 940,
+         920, 910, 900, 890, 880, 870, 860, 850, 840, 830, 820, 820, 810, 800, 790, 780, 770,
+         760, 760, 750, 740, 730, 720, 720, 710, 700, 700, 690, 680, 680, 670, 660, 660, 650,
+         640, 640, 630, 630, 620, 620, 610, 610, 600, 600, 590, 590, 580, 580, 570, 570, 560,
+         560, 550, 550, 540, 540, 540, 530, 530, 520, 520, 520, 510, 510, 510, 500, 500, 490,
+         490, 490, 480, 480, 480, 480, 470, 470, 470, 460, 460, 460, 450, 450, 450, 450, 440,
+         440, 440, 440, 430, 430, 430, 430, 420, 420, 420, 420, 410, 410, 410, 410, 410, 400,
+         400, 400, 400, 390, 390, 390, 390, 390, 380, 380, 380, 380, 380, 370, 370, 370, 370,
+         370, 360, 360, 360, 360, 350, 350, 350, 340])
 
     # Start simulation
     optim_v = np.zeros(len(gamma))
     min_mr = np.zeros(len(gamma))
+    mp_list = np.zeros((len(gamma), 3))
     for i in tqdm(range(len(gamma))):
         angle = gamma[i]
         for j, vel in enumerate(v0):
-            mass_ratio[i, j] = launch_circular(angle, vel, Isp=Isp, return_mass_ratio=True)
+            if vel < min_v[i]:
+                continue
+            mr = launch_circular(angle, vel, Isp=Isp, return_mass_ratio=True)
+            mass_ratio[i, j] = mr
 
         if np.isnan(mass_ratio[i,:]).all():
             optim_v[i] = np.nan
             min_mr[i] = np.nan
+            mp_list[i, :] = np.nan
         else:
             min_mr[i] = np.nanmin(mass_ratio[i, :])
             optim_v[i] = v0[np.where(mass_ratio[i, :] == min_mr[i])[0][0]]
@@ -357,51 +441,134 @@ def optimize_mass_ratio(gamma: np.ndarray, v0: np.ndarray, Isp: float = 300, plo
             stretched_mass_ratio = np.repeat(mass_ratio, repeat_factor, axis=0)
             stretched_mass_ratio = stretched_mass_ratio[:width, :]
 
+        filled_mr = fill_nan_2d(stretched_mass_ratio)
+        np.savetxt('stretched_mass_ratio.csv', stretched_mass_ratio, delimiter=',')
+        np.savetxt('filled_mass_ratio.csv', filled_mr, delimiter=',')
+
         plt.imshow(stretched_mass_ratio)
         cbar = plt.colorbar()
         cbar.set_label('Mass ratio')
 
         plt.xticks(ticks=np.arange(0 + int(repeat_factor / 2), len(stretched_mass_ratio[0]), 2 * repeat_factor), labels=np.array(np.round(v0[::2]), dtype=int))
-        plt.yticks(ticks=np.arange(0, len(gamma), 5), labels=np.array(np.round(np.degrees(gamma[::5]), 1), dtype=int))
+        plt.yticks(ticks=np.arange(0, len(gamma), 2), labels=np.array(np.round(np.degrees(gamma[::2]), 1), dtype=int))
 
         plt.xlabel('Initial velocity [m/s]')
         plt.ylabel('Launch angle [deg]')
         plt.show()
 
-    return min_mr, optim_v
+        plt.imshow(filled_mr)
+        cbar = plt.colorbar()
+        cbar.set_label('Mass ratio')
+
+        plt.xticks(ticks=np.arange(0 + int(repeat_factor / 2), len(stretched_mass_ratio[0]), 2 * repeat_factor),
+                   labels=np.array(np.round(v0[::2]), dtype=int))
+        plt.yticks(ticks=np.arange(0, len(gamma), 5), labels=np.array(np.round(np.degrees(gamma[::5]), 1), dtype=int))
+
+        plt.xlabel('Initial velocity [m/s]')
+        plt.ylabel('Launch angle [deg]')
+        plt.title('Interpolated mass ratio')
+        plt.show()
+
+    return filled_mr
+
+
+def minimum_velocity_to_orbit(
+        gamma: np.ndarray = np.radians(np.arange(0.5, 90, 0.5)),
+        construction_mass_ratio: float = 0.1,
+        Isp: float = 300
+        ):
+    """
+    Function to find the minimum velocity needed to reach orbit from the Moon surface given a specific construction
+    mass ratio and specific impulse
+    :param gamma: np.ndarray, launch angles to be evaluated
+    :param construction_mass_ratio: float, construction mass ratio
+    :param Isp: float, specific impulse
+    """
+    # TODO: check
+    velocity = np.zeros(len(gamma))
+    ratio = np.zeros(len(gamma))
+    v = 100
+    for i in tqdm(range(len(gamma))):
+        mass_ratio = launch_circular(gamma[-(i+1)], v, Isp=Isp, return_mass_ratio=True)
+        while np.isnan(mass_ratio):
+            v += 1
+            mass_ratio = launch_circular(gamma[-(i+1)], v, Isp=Isp, return_mass_ratio=True)
+
+        velocity[-(i+1)] = v
+        ratio[-(i+1)] = mass_ratio
+
+    return velocity, ratio
+
+
+def fill_nan_2d(array):
+    # Get the indices of the valid values
+    valid_mask = ~np.isnan(array)
+    valid_coords = np.array(np.nonzero(valid_mask)).T
+    valid_values = array[valid_mask]
+
+    # Get the indices of the nan values
+    nan_coords = np.array(np.nonzero(~valid_mask)).T
+
+    # Interpolate the nan values
+    filled_values = griddata(valid_coords, valid_values, nan_coords, method='linear')
+
+    # Fill the nan values in the original array
+    filled_array = array.copy()
+    filled_array[~valid_mask] = filled_values
+
+    return filled_array
 
 
 if __name__ == '__main__':
+    # min_v, min_ratio = minimum_velocity_to_orbit()
+    # v, ratio = optimize_initial_params_rough()
+    #
+    # plt.plot(np.arange(0.5, 90, 0.5), v, label='Optimum')
+    # plt.plot(np.arange(0.5, 90, 0.5), min_v, label='Minimum')
+    # plt.xlabel('Launch angle [deg]')
+    # plt.ylabel('Launch velocity [m/s]')
+    # plt.legend()
+    # plt.show()
+    #
+    # plt.plot(np.arange(0.5, 90, 0.5), ratio, label='Optimum v')
+    # plt.plot(np.arange(0.5, 90, 0.5), min_ratio, label='Minimum v')
+    # plt.xlabel('Launch angle [deg]')
+    # plt.ylabel('Mass ratio [-]')
+    # plt.legend()
+    # plt.show()
+
     # Design range
-    gamma = np.radians(np.arange(0, 90, 5))
-    v0 = np.arange(200, 2000, 100)
+    gamma = np.radians(np.arange(0.5, 90, 0.5))
+    v0 = np.linspace(200, 2000, len(gamma) + 1)
 
-    useful_mass_fraction = optimize_initial_params(gamma, v0)
+    # Load the mass_ratio data
+    mass_ratio = np.loadtxt('filled_mass_ratio.csv', delimiter=',')
+    mass_ratio[mass_ratio <= 0] = np.nan
 
-    for i in range(len(useful_mass_fraction[:,0])):
-        row = useful_mass_fraction[i,:]
-        if np.isnan(row).all():
-            continue
-
-        velocity = np.where(row == np.nanmin(row))[0][0]
-
-        plt.scatter(v0[velocity], gamma[i], color='r')  # 'ro' plots a red dot
-
-    # Continue with the existing plotting code
-    plt.imshow(useful_mass_fraction, vmin=1, vmax=3)
-
-    # Plot color grid
-    gr_min = 1
-    gr_max = 4
-    # Define color scale
+    # Create a heatmap
+    plt.imshow(mass_ratio, aspect='auto', origin='lower', cmap='viridis')
     cbar = plt.colorbar()
-    cbar.set_label('Gear ratio')
-    plt.xticks(ticks=np.arange(0, len(v0), 2), labels=np.array(np.round(v0[::2]), dtype=int))
-    plt.yticks(ticks=np.arange(0, len(gamma), 5), labels=np.array(np.round(np.degrees(gamma[::5])), dtype=int))
+    cbar.set_label('Mass ratio')
 
+    # Add contour lines
+    contours = plt.contour(mass_ratio, colors='white', linewidths=0.5)
+    plt.clabel(contours, inline=True, fontsize=8, fmt='%1.2f')
+
+    # Find the minimum value in each row and plot a red line pointing at these minimum values
+    min_indices = np.nanargmin(mass_ratio, axis=1)
+    plt.plot(min_indices, np.arange(len(min_indices)), 'r-', linewidth=2)
+
+    # Set axis labels and title
     plt.xlabel('Initial velocity [m/s]')
-    plt.ylabel('Launch angle [degrees]')
-    plt.title('Mass = 1T, Isp = 300s, Mc/M = 0.1, Thrust = 1kN')
+    plt.ylabel('Launch angle [deg]')
+    # plt.title('Mass ratio heatmap with contours and minimum values')
 
+    # Set x and y ticks
+    plt.xticks(ticks=np.arange(0, len(v0), 20), labels=np.array(np.round(v0[::20]), dtype=int))
+    plt.yticks(ticks=np.arange(9, len(gamma), 10), labels=np.array(np.round(np.degrees(gamma[9::10]), 1), dtype=int))
+
+    # Show the plot
     plt.show()
+
+
 
