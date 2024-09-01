@@ -1,10 +1,89 @@
 from OrbitalDynamics.launch_trajectories import moon_launch_optim
+from OrbitalDynamics.spinLaunch import fill_nan_2d, optimize_mass_ratio
 import matplotlib.pyplot as plt
 import numpy as np
 
 
 def polynomial(x, *p):
     return sum([p[i] * x ** i for i in range(len(p))])
+
+
+def plot_2D_figure(
+        array: np.ndarray,
+        colorbar_label: str,
+        initial_angles: np.ndarray = np.radians(np.arange(0.5, 90, 0.5)),
+        initial_velocities: np.ndarray = np.linspace(200, 2000, 180),
+        xlabel: str = 'Launch angle [deg]',
+        ylabel: str = 'Initial velocity [m/s]',
+        extended: bool = False,
+        plot_paths: bool = False,
+        contour: bool = False,
+        save: str = None):
+
+    if extended:
+        array_ext = np.empty((array.shape[0] * 2, array.shape[1]))
+        array_ext[::2] = array
+        array_ext[1::2] = array
+
+        array = array_ext.T
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # Create a heatmap
+    cax = ax.imshow(array, aspect='auto', origin='lower', cmap='viridis')
+
+    # Create color bar
+    cbar = fig.colorbar(cax, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label(colorbar_label, fontsize=14)
+    cbar.ax.tick_params(labelsize=12)
+
+    if contour:
+        if extended:
+            contours = ax.contour(array, colors='white', linewidths=1)
+            ax.clabel(contours, inline=True, fontsize=12, fmt='%1.2f')
+        else:
+            contours = ax.contour(array, colors='white', linewidths=0.5)
+            ax.clabel(contours, inline=True, fontsize=8, fmt='%1.2f')
+
+    # Create labels
+    ax.set_xlabel(xlabel, fontsize=14)
+    ax.set_ylabel(ylabel, fontsize=14)
+
+    # Formatting
+    x_labels = np.array(np.arange(10, 90, 10), dtype=int)
+    x_ticks = np.searchsorted(initial_angles, np.radians(x_labels)) * 2
+    plt.xticks(ticks=x_ticks,
+               labels=x_labels,
+               fontsize=12)
+
+    y_labels = np.arange(200, 2000, 200)
+    y_ticks = np.searchsorted(initial_velocities, y_labels)
+    plt.yticks(ticks=y_ticks,
+               labels=y_labels,
+               fontsize=12)
+
+    # Plot optimal path
+    if plot_paths:
+        if extended:
+            ax.plot(np.arange(len(min_prop_ext)), min_prop_ext,
+                    color='tab:red', linestyle='-', label='Case 2 opt')
+            ax.plot(np.searchsorted(gamma, launch_params_maglev[:, 0]) * 2,
+                    np.searchsorted(v0, launch_params_maglev[:, 1]),
+                    color='tab:red', linestyle='--', label='Case 1 opt')
+        else:
+            ax.plot(np.arange(len(min_prop)), min_prop,
+                    color='tab:red', linestyle='-', label='Csae 2 opt')
+            ax.plot(np.searchsorted(gamma, launch_params_maglev[:, 0]),
+                    np.searchsorted(v0, launch_params_maglev[:, 1]),
+                    color='tab:red', linestyle='--', label='Case 1 opt')
+        fig.legend(bbox_to_anchor=(0.3, 0.31), fontsize=12)
+
+    ax.grid(True)
+    fig.tight_layout()
+
+    if save is not None:
+        plt.savefig(f'Plots\\{save}.pdf')
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -23,67 +102,45 @@ if __name__ == '__main__':
     v0 = np.linspace(200, 2000, len(gamma) + 1)
 
     # Calculate ratio
-    # spinLaunch_ratio_0, optimal_v, mp_data = optimize_mass_ratio(gamma, v0, Isp, plot_mass_ratio=False)
-    mass_ratio = np.loadtxt('filled_mass_ratio.csv', delimiter=',')
+    # spinLaunch_ratio_0, end_prop, circularization_prop, final_height, final_angle, final_velocity = optimize_mass_ratio(gamma, v0, Isp, plot_mass_ratio=False, mass_diagnostics=True)
+    # np.savetxt('filled_mass_ratio_v2.csv', spinLaunch_ratio_0, delimiter=',')
+    # np.savetxt('end_prop_v2.csv', end_prop, delimiter=',')
+    # np.savetxt('circularization_prop_v2.csv', circularization_prop, delimiter=',')
+    # np.savetxt('final_height.csv', final_height, delimiter=',')
+    # np.savetxt('final_angle.csv', final_angle, delimiter=',')
+    # mass_ratio = spinLaunch_ratio_0
+
+    # Load values and fill in NaNs
+    mass_ratio = np.loadtxt('filled_mass_ratio_v2.csv', delimiter=',')
     mass_ratio[mass_ratio <= 0] = np.nan
+    minimum_ratio = np.nanmin(mass_ratio)
+    mass_ratio = fill_nan_2d(mass_ratio)
+    mass_ratio[mass_ratio <= minimum_ratio] = np.nan
 
-    # Extend the array horizontally for better plotting
-    mass_ratio_T = mass_ratio.T
+    min_prop = np.nanargmin(mass_ratio, axis=1)
+    min_prop_ext = np.empty((min_prop.size * 2))
+    min_prop_ext[::2] = min_prop
+    min_prop_ext[1::2] = min_prop
 
-    mass_ratio_T_duplicated = np.empty((mass_ratio_T.shape[0], mass_ratio_T.shape[1] * 2))
-    mass_ratio_T_duplicated[:, ::2] = mass_ratio_T
-    mass_ratio_T_duplicated[:, 1::2] = mass_ratio_T
+    end_prop = np.loadtxt('end_prop_v2.csv', delimiter=',')
+    end_prop[end_prop <= 0] = np.nan
+    minimum_prop = np.nanmin(end_prop)
+    end_prop = fill_nan_2d(end_prop)
+    end_prop[end_prop <= minimum_prop] = np.nan
+
+    circularization_prop = np.loadtxt('circularization_prop_v2.csv', delimiter=',')
+    circularization_prop[circularization_prop <= 0] = np.nan
+    minimum_prop = np.nanmin(circularization_prop)
+    circularization_prop = fill_nan_2d(circularization_prop)
+    circularization_prop[circularization_prop <= minimum_prop] = np.nan
+
 
     # Plot spinLaunch
-    fig, ax = plt.subplots(figsize=(12, 6))
+    plot_2D_figure(mass_ratio, 'Mass ratio [-]', extended=True, plot_paths=True,
+                   save='spinLaunch_mass_ratio', contour=True)
 
-    # Create a heatmap
-    cax = ax.imshow(mass_ratio_T_duplicated, aspect='auto', origin='lower', cmap='viridis')
-
-    # Create color bar
-    cbar = fig.colorbar(cax, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label('Mass ratio', fontsize=14)
-    cbar.ax.tick_params(labelsize=12)
-
-    # Add contour lines
-    contours = plt.contour(mass_ratio_T_duplicated, colors='white', linewidths=1)
-    plt.clabel(contours, inline=True, fontsize=12, fmt='%1.2f')
-
-    # Create labels
-    ax.set_xlabel('Launch angle [deg]', fontsize=14)
-    ax.set_ylabel('Initial velocity [m/s]', fontsize=14)
-
-    # Formatting
-    x_labels = np.array(np.arange(10, 90, 10), dtype=int)
-    x_ticks = np.searchsorted(gamma, np.radians(x_labels)) * 2
-    plt.xticks(ticks=x_ticks,
-               labels=x_labels,
-               fontsize=12)
-
-    y_labels = np.arange(200, 2000, 200)
-    y_ticks = np.searchsorted(v0, y_labels)
-    plt.yticks(ticks=y_ticks,
-               labels=y_labels,
-               fontsize=12)
-
-    # Plot optimal path
-    min_ratio = np.nanargmin(mass_ratio_T_duplicated, axis=0)
-    launch_params_maglev_ext = np.empty((launch_params_maglev.shape[0] * 2, launch_params_maglev.shape[1]))
-    launch_params_maglev_ext[::2] = launch_params_maglev
-    launch_params_maglev_ext[1::2] = launch_params_maglev
-
-    ax.plot(np.searchsorted(gamma, launch_params_maglev[:, 0]) * 2,
-            np.searchsorted(v0, launch_params_maglev[:, 1]),
-            color='tab:red', linestyle='--', label='Case 1 opt')
-    ax.plot(np.arange(len(min_ratio)), min_ratio, color='tab:red', linestyle='-', label='Case 2 opt')
-    ax.grid(True)
-
-    fig.legend(bbox_to_anchor=(0.3, 0.31), fontsize=12)
-    fig.tight_layout()
-    plt.savefig('Plots\\spinLaunch_mass_ratio.pdf')
-    plt.show()
-
-    ## Optimum and minimum velocities and their corresponding ratios
+    ### Optimum and minimum velocities and their corresponding ratios
+    mass_ratio_T = mass_ratio.T
     first_non_nan_indices = np.full(mass_ratio_T.shape[1], np.nan)
 
     # Iterate over each column to find the first non-NaN value
@@ -96,7 +153,7 @@ if __name__ == '__main__':
             ratio_min_v.append(mass_ratio_T[int(non_nan_indices[0]), col])
             min_v.append(v0[int(non_nan_indices[0])])
 
-    # Plot ratios
+    ## Plot ratios
     fig, ax = plt.subplots(figsize=(12, 6))
 
     # Maglev params
@@ -118,10 +175,10 @@ if __name__ == '__main__':
     ax.grid(True)
     ax.legend(bbox_to_anchor=(0.64, 0.945), fontsize=12)
 
-    plt.savefig('Plots\\Opt_and_min_ratios.pdf')
+    # # plt.savefig('Plots\\Opt_and_min_ratios.pdf')
     plt.show()
 
-    # Plot velocities
+    ## Plot velocities
     fig, ax = plt.subplots(figsize=(12, 6))
 
     # Maglev params
@@ -144,5 +201,31 @@ if __name__ == '__main__':
     ax.grid(True)
     ax.legend(fontsize=12)
 
-    plt.savefig('Plots\\Opt_and_min_velocities.pdf')
+    # # plt.savefig('Plots\\Opt_and_min_velocities.pdf')
     plt.show()
+
+
+    ### Mass diagnostics
+
+    ## Propellant burnt during ascension
+    ascension = 900 - (end_prop + circularization_prop)
+    ascension[np.where(ascension == 900)] = np.nan
+    ascension = fill_nan_2d(ascension)
+
+    plot_2D_figure(ascension, 'Mass burnt in ascension [kg]', extended=True, save='ascension_propellant',
+                   plot_paths=True)
+
+
+    ## Propellant burnt during circularization
+    circularization_prop[np.where(circularization_prop <= 0)] = np.nan
+    circularization_prop = fill_nan_2d(circularization_prop)
+
+    # Extend the array
+    circularization_prop_ext = np.empty((circularization_prop.shape[0] * 2, circularization_prop.shape[1]))
+    circularization_prop_ext[::2] = circularization_prop
+    circularization_prop_ext[1::2] = circularization_prop
+
+    # Plot results
+    plot_2D_figure(circularization_prop, 'Mass burnt in circularization [kg]', extended=True,
+                   save='circularization_propellant', contour=True, plot_paths=True)
+
