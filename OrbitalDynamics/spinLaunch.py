@@ -3,7 +3,8 @@ import scipy
 import matplotlib.pyplot as plt
 import matplotlib
 from tqdm import tqdm
-from OrbitalDynamics.pycode.HelperFunctions import gravitational_param_dict, average_radius_dict
+from OrbitalDynamics.pycode.HelperFunctions import LaunchTrajectory
+from OrbitalDynamics.pycode.CustomConstants import gravitational_param_dict, average_radius_dict
 import warnings
 from scipy.optimize import minimize
 from scipy.interpolate import griddata
@@ -234,159 +235,9 @@ def launch_circular(gamma0, v0,
     return gr
 
 
-##### TODO Launch_alt function, to be removed after verification of the new launch_circular
-def launch_alt(angle, v0,
-           Isp: float = 300,
-           construction_ratio: float = 0.1,
-           mass: float = 1000,
-           thrust: float = 1000):
-    '''Equations of motion for gravity turn in polar coordinates'''
-
-    g = 1.625  # Gravity on the Moon
-    v_target = np.sqrt(gravitational_param_dict['Moon'] / (average_radius_dict['Moon'] + 1e5))  # Orbital velocity
-
-    dt = 1e-2
-    prop_mass_ratio = 1 / 10
-
-    convergence = False
-    falling = False
-    removed_mass = False
-
-    while not convergence:
-        total_mass = mass
-        mp = total_mass * (1 - construction_ratio) * prop_mass_ratio  # Propellant to be burnt during ascent
-        dry_mass = total_mass - mp
-
-        t = 0
-        v = v0
-        gamma = angle
-        pos = np.array([[average_radius_dict['Moon'], 0]])
-        new_r = average_radius_dict['Moon']
-
-        # Start simulation
-        while gamma >= 0:
-
-            current_mass = dry_mass + mp
-            current_r = new_r
-
-            # Calculate thrust
-            if mp <= 0:
-                thrust = 0
-
-            # EOM
-            dVdt = thrust / current_mass - g * np.sin(gamma)
-            dGdt = 1 / v * (-g) * np.cos(gamma) * (1 - v**2 / (g * current_r) )
-
-            # Update the state
-            gamma += dGdt * dt
-            v += dVdt * dt
-            t += dt
-
-            # Update mass
-            dm = current_mass * (1 - np.exp(-dVdt * dt / (Isp * 9.81)))
-            current_mass -= dm
-            mp -= dm
-
-            # Store position values and check end conditions
-            dr = v * np.sin(gamma) * dt
-            dtheta = v * np.cos(gamma) / current_r * dt
-            pos = np.vstack((pos, pos[-1] + np.array([dr, dtheta])))
-
-            if pos[-1, 0] < pos[-2, 0]:  # We are falling
-                falling = True
-                break
-
-            if pos[-1, 0] > average_radius_dict['Moon'] + 1e5:  # We are overshooting
-                break
-
-            new_r = pos[-1, 0]
-
-        # Analyze exit conditions
-        if gamma <= np.radians(5) and pos[-1, 0] >= average_radius_dict['Moon'] + 1e5:  # Solution found
-            convergence = True
-
-        if falling:
-            if removed_mass:
-                # The solution lies between the previous and current mass fractions
-                prop_mass_ratio += 1 / 20
-                convergence = True
-            else:
-                prop_mass_ratio += 1 / 20  # Add propellant mass
-                if prop_mass_ratio >= 1:
-                    # Not enough mass
-                    return np.nan
-
-        else:
-            if pos[-1, 0] > average_radius_dict['Moon'] + 1e5:  # Overshoot
-                # Rocket could have burnt less mass
-                prop_mass_ratio -= 1 / 20
-                removed_mass = True
-                if prop_mass_ratio <= 0:
-                    # Solution lies between 0 and 1/20 propellant mass ratio
-                    prop_mass_ratio += 1 / 20
-                    convergence = True
-            else:  # Undershoot
-                prop_mass_ratio += 1 / 20
-                if removed_mass:
-                    # The solution lies between the previous and current mass fractions
-                    convergence = True
-
-    # Calculate final impulse for circularization
-    deltaV = np.sqrt(v ** 2 + v_target ** 2 - 2 * v * v_target * np.cos(gamma))  # From cosine law
-    dm_manoeuvre = current_mass * (1 - np.exp(-deltaV / (Isp * 9.81)))  # Defined as > 0
-
-    ### Calculate gear ratio (ratio between the total propellant at t0 and the propellant that can be delivered) ###
-    mp_initial = total_mass * (1 - construction_ratio)
-    mp_final = total_mass * (1 - construction_ratio) * (1 - prop_mass_ratio) - dm_manoeuvre
-    gr = mp_initial / mp_final  # Gear ratio
-
-    # plt.plot(pos[:,0] * np.cos(pos[:,1]), pos[:,0] * np.sin(pos[:,1]))
-    # plt.show()
-    # plt.plot(np.arange(0,len(pos[:,0])) * 0.01, (pos[:,0] - average_radius_dict['Moon']) / 1000)
-    # plt.show()
-
-    return gr
-
-
 def launch_funct(vel, angle):
     ratio = launch_circular(angle, vel, return_mass_ratio=True)
     return ratio
-
-
-def optimize_initial_params_rough():
-    min_v = np.array([1560, 1510, 1480, 1450, 1420, 1400, 1380, 1360, 1340, 1320, 1310, 1290, 1280, 1260, 1250, 1240, 1230,
-                      1220, 1210, 1200, 1190, 1180, 1170, 1160, 1150, 1140, 1140, 1130, 1120, 1120, 1110, 1100, 1100, 1090,
-                      1080, 1080, 1070, 1070, 1060, 1060, 1050, 1040, 1030, 1010, 1000,  990,  980,  970, 960,  950,  940,
-                      920,  910,  900,  890,  880,  870,  860,  850,  840,  830,  820,  820,  810,  800,  790,  780,  770,
-                      760,  760,  750,  740,  730,  720,  720,  710,  700,  700,  690,  680,  680,  670,  660,  660,  650,
-                      640,  640,  630,  630,  620,  620,  610,  610,  600,  600,  590,  590,  580,  580,  570,  570,  560,
-                      560,  550,  550,  540,  540,  540,  530,  530,  520,  520,  520,  510,  510,  510,  500,  500,  490,
-                      490,  490,  480,  480,  480,  480,  470,  470,  470,  460,  460,  460,  450,  450,  450,  450,  440,
-                      440,  440,  440,  430,  430,  430,  430,  420,  420,  420,  420,  410,  410,  410,  410,  410,  400,
-                      400,  400,  400,  390,  390,  390,  390,  390,  380,  380,  380,  380,  380,  370,  370,  370,  370,
-                      370,  360,  360,  360,  360,  350,  350,  350,  340])
-
-    opt_v = []
-    opt_ratio = []
-    gamma = np.radians(np.arange(0.5, 90, 0.5))
-
-    for i in tqdm(range(len(gamma))):
-        previous = 1000
-        v = min_v[i]
-
-        mass_ratio = launch_circular(gamma[i], v, return_mass_ratio=True)
-        while previous > mass_ratio:
-            if np.degrees(gamma[i]) < 20:
-                v += 0.1
-            else:
-                v += 1
-            previous = mass_ratio
-            mass_ratio = launch_circular(gamma[i], v, return_mass_ratio=True)
-
-        opt_v.append(v - 1)
-        opt_ratio.append(previous)
-
-    return opt_v, opt_ratio
 
 
 def fill_nan_2d(array):
@@ -411,7 +262,6 @@ def fill_nan_2d(array):
 def optimize_mass_ratio(gamma: np.ndarray,
                         v0: np.ndarray,
                         Isp: float = 300,
-                        plot_mass_ratio: bool = False,
                         mass_diagnostics: bool = False):
     # Initialize arrays to save solution
     mass_ratio = np.zeros((len(gamma), len(v0)))
@@ -420,6 +270,8 @@ def optimize_mass_ratio(gamma: np.ndarray,
     final_height = np.zeros((len(gamma), len(v0)))
     final_angle = np.zeros((len(gamma), len(v0)))
     final_vel = np.zeros((len(gamma), len(v0)))
+
+    gamma_min_v = np.radians(np.arange(0.5, 90, 0.5))
 
     min_v = np.array(
         [1560, 1510, 1480, 1450, 1420, 1400, 1380, 1360, 1340, 1320, 1310, 1290, 1280, 1260, 1250, 1240, 1230, 1220,
@@ -432,54 +284,36 @@ def optimize_mass_ratio(gamma: np.ndarray,
          420, 420, 420, 410, 410, 410, 410, 410, 400, 400, 400, 400, 390, 390, 390, 390, 390, 380, 380, 380, 380, 380,
          370, 370, 370, 370, 370, 360, 360, 360, 360, 350, 350, 350, 340])
 
+
     # Start simulation
     for i in tqdm(range(len(gamma))):
         angle = gamma[i]
         for j, vel in enumerate(v0):
-            if vel < min_v[i]:
+            minimum_v = min_v[np.searchsorted(gamma_min_v, angle)]
+            trajectory = LaunchTrajectory('Moon', initial_velocity=vel, launch_angle=angle)
+
+            if vel < minimum_v:
                 continue
 
-            if not mass_diagnostics:
-                mr = launch_circular(angle, vel, Isp=Isp, return_mass_ratio=True)
+            elif minimum_v < vel and trajectory.ra < 100e3 + average_radius_dict['Moon']:
+                if not mass_diagnostics:
+                    mr = launch_circular(angle, vel, Isp=Isp, return_mass_ratio=True)
+                else:
+                    mr, mp_end, dm_manoeuvre, height, gamma_fin, velocity = launch_circular(angle, vel, Isp=Isp, return_mass_ratio=True, full_output=True)
+                    end_propellant[i, j] = mp_end
+                    circularization_mass[i, j] = dm_manoeuvre
+                    final_height[i, j] = height
+                    final_angle[i, j] = gamma_fin
+                    final_vel[i, j] = velocity
+
             else:
-                mr, mp_end, dm_manoeuvre, height, gamma_fin, velocity = launch_circular(angle, vel, Isp=Isp, return_mass_ratio=True, full_output=True)
-                end_propellant[i, j] = mp_end
-                circularization_mass[i, j] = dm_manoeuvre
-                final_height[i, j] = height
-                final_angle[i, j] = gamma_fin
-                final_vel[i, j] = velocity
+                deltaV = trajectory.get_deltaV_for_circularization(100e3)
+                mr = np.exp(deltaV / (Isp * 9.81)) - 1
 
             mass_ratio[i, j] = mr
 
     if mass_diagnostics:
         return mass_ratio, end_propellant, circularization_mass, final_height, final_angle, final_vel
-
-    if plot_mass_ratio:
-        height, width = mass_ratio.shape
-        if height > width:
-            repeat_factor = height // width
-            stretched_mass_ratio = np.repeat(mass_ratio, repeat_factor, axis=1)
-            stretched_mass_ratio = stretched_mass_ratio[:, :height]
-        else:
-            repeat_factor = width // height
-            stretched_mass_ratio = np.repeat(mass_ratio, repeat_factor, axis=0)
-            stretched_mass_ratio = stretched_mass_ratio[:width, :]
-
-        # filled_mr = fill_nan_2d(stretched_mass_ratio)
-        np.savetxt('stretched_mass_ratio.csv', stretched_mass_ratio, delimiter=',')
-
-        plt.imshow(stretched_mass_ratio)
-        cbar = plt.colorbar()
-        cbar.set_label('Mass ratio')
-
-        plt.xticks(ticks=np.arange(0 + int(repeat_factor / 2), len(stretched_mass_ratio[0]), 2 * repeat_factor), labels=np.array(np.round(v0[::2]), dtype=int))
-        plt.yticks(ticks=np.arange(0, len(gamma), 2), labels=np.array(np.round(np.degrees(gamma[::2]), 1), dtype=int))
-
-        plt.xlabel('Initial velocity [m/s]')
-        plt.ylabel('Launch angle [deg]')
-        plt.show()
-
-        return stretched_mass_ratio
 
     return mass_ratio
 

@@ -72,7 +72,7 @@ def plot_2D_figure(
                     color='tab:red', linestyle='--', label='Case 1 opt')
         else:
             ax.plot(np.arange(len(min_prop)), min_prop,
-                    color='tab:red', linestyle='-', label='Csae 2 opt')
+                    color='tab:red', linestyle='-', label='Case 2 opt')
             ax.plot(np.searchsorted(gamma, launch_params_maglev[:, 0]),
                     np.searchsorted(v0, launch_params_maglev[:, 1]),
                     color='tab:red', linestyle='--', label='Case 1 opt')
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     v0 = np.linspace(200, 2000, len(gamma) + 1)
 
     # Calculate ratio
-    # spinLaunch_ratio_0, end_prop, circularization_prop, final_height, final_angle, final_velocity = optimize_mass_ratio(gamma, v0, Isp, plot_mass_ratio=False, mass_diagnostics=True)
+    # spinLaunch_ratio_0, end_prop, circularization_prop, final_height, final_angle, final_velocity = optimize_mass_ratio(gamma, v0, Isp, mass_diagnostics=True)
     # np.savetxt('filled_mass_ratio_v2.csv', spinLaunch_ratio_0, delimiter=',')
     # np.savetxt('end_prop_v2.csv', end_prop, delimiter=',')
     # np.savetxt('circularization_prop_v2.csv', circularization_prop, delimiter=',')
@@ -113,9 +113,11 @@ if __name__ == '__main__':
     # mass_ratio = spinLaunch_ratio_0
 
     # Load values and fill in NaNs
-    mass_ratio = np.loadtxt('filled_mass_ratio_v2.csv', delimiter=',')
-    mass_ratio[mass_ratio <= 0] = np.nan
+    # mass_ratio = np.loadtxt('filled_mass_ratio_v2.csv', delimiter=',')
+
+    mass_ratio = optimize_mass_ratio(gamma, v0, Isp, mass_diagnostics=False)
     minimum_ratio = np.nanmin(mass_ratio)
+    mass_ratio[mass_ratio <= 0] = np.nan
     mass_ratio = fill_nan_2d(mass_ratio)
     mass_ratio[mass_ratio <= minimum_ratio] = np.nan
 
@@ -127,17 +129,17 @@ if __name__ == '__main__':
     min_prop_ext[::2] = min_prop
     min_prop_ext[1::2] = min_prop
 
-    end_prop = np.loadtxt('end_prop_v2.csv', delimiter=',')
-    end_prop[end_prop <= 0] = np.nan
-    minimum_prop = np.nanmin(end_prop)
-    end_prop = fill_nan_2d(end_prop)
-    end_prop[end_prop <= minimum_prop] = np.nan
-
-    circularization_prop = np.loadtxt('circularization_prop_v2.csv', delimiter=',')
-    circularization_prop[circularization_prop <= 0] = np.nan
-    minimum_prop = np.nanmin(circularization_prop)
-    circularization_prop = fill_nan_2d(circularization_prop)
-    circularization_prop[circularization_prop <= minimum_prop] = np.nan
+    # end_prop = np.loadtxt('end_prop_v2.csv', delimiter=',')
+    # end_prop[end_prop <= 0] = np.nan
+    # minimum_prop = np.nanmin(end_prop)
+    # end_prop = fill_nan_2d(end_prop)
+    # end_prop[end_prop <= minimum_prop] = np.nan
+    #
+    # circularization_prop = np.loadtxt('circularization_prop_v2.csv', delimiter=',')
+    # circularization_prop[circularization_prop <= 0] = np.nan
+    # minimum_prop = np.nanmin(circularization_prop)
+    # circularization_prop = fill_nan_2d(circularization_prop)
+    # circularization_prop[circularization_prop <= minimum_prop] = np.nan
 
 
     # Plot spinLaunch
@@ -213,24 +215,24 @@ if __name__ == '__main__':
     ### Mass diagnostics
 
     ## Propellant burnt during ascension
-    ascension = 900 - (end_prop + circularization_prop)
-    ascension[np.where(ascension == 900)] = np.nan
-    ascension = fill_nan_2d(ascension)
-
-    plot_2D_figure(ascension, 'Mass burnt in ascension [kg]', extended=True, save='ascension_propellant',
-                   plot_paths=True)
-
-
-    ## Propellant burnt during circularization
-    circularization_prop[np.where(circularization_prop <= 0)] = np.nan
-    circularization_prop = fill_nan_2d(circularization_prop)
-
-    # Extend the array
-    circularization_prop_ext = np.empty((circularization_prop.shape[0] * 2, circularization_prop.shape[1]))
-    circularization_prop_ext[::2] = circularization_prop
-    circularization_prop_ext[1::2] = circularization_prop
-
-    # Plot results
-    plot_2D_figure(circularization_prop, 'Mass burnt in circularization [kg]', extended=True,
-                   save='circularization_propellant', contour=True, plot_paths=True)
+    # # ascension = 900 - (end_prop + circularization_prop)
+    # # ascension[np.where(ascension == 900)] = np.nan
+    # # ascension = fill_nan_2d(ascension)
+    # #
+    # # plot_2D_figure(ascension, 'Mass burnt in ascension [kg]', extended=True, save='ascension_propellant',
+    # #                plot_paths=True)
+    # #
+    # #
+    # # ## Propellant burnt during circularization
+    # # circularization_prop[np.where(circularization_prop <= 0)] = np.nan
+    # # circularization_prop = fill_nan_2d(circularization_prop)
+    # #
+    # # # Extend the array
+    # # circularization_prop_ext = np.empty((circularization_prop.shape[0] * 2, circularization_prop.shape[1]))
+    # # circularization_prop_ext[::2] = circularization_prop
+    # # circularization_prop_ext[1::2] = circularization_prop
+    #
+    # # Plot results
+    # plot_2D_figure(circularization_prop, 'Mass burnt in circularization [kg]', extended=True,
+    #                save='circularization_propellant', contour=True, plot_paths=True)
 

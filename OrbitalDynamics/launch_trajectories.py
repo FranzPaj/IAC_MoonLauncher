@@ -64,7 +64,7 @@ def moon_launch_optim(plot: bool = False, return_params: bool = False):
         launch_trajectory.reinitialize_paramters(angle, vel)
 
         # Store results
-        delta_v.append(launch_trajectory.get_deltav_for_circularization())
+        delta_v.append(launch_trajectory.get_deltaV_for_circularization())
         launch_params.append([angle, vel])
 
     if plot:

@@ -82,12 +82,35 @@ class Orbit:
 
         return deltav
 
-    def get_deltav_for_circularization(self):
+    def get_velocity_at_altitude(self, h: float):
         """
-        Function for calculating the delta-v required to circularize at apogee
+        Function for calculating the velocity at a given altitude
         """
-        vc = np.sqrt(self.mu / self.ra)
-        return vc - self.va
+        r = self.R + h
+        v = np.sqrt(self.mu * (2 / r - 1 / self.sma))
+        return v
+
+    def get_gamma_at_altitude(self, h: float):
+        """
+        Function for calculating the flight path angle at a given altitude
+        """
+        r = self.R + h
+        v = self.get_velocity_at_altitude(h)
+        gamma = np.arccos(self.h / (r * v))
+        return gamma
+
+    def get_deltaV_for_circularization(self, h: float = None):
+        """
+        Function for calculating the delta-V required to circularize at a given altitude
+        """
+        if h is None:
+            vc = np.sqrt(self.mu / self.ra)
+            return vc - self.va
+
+        v = self.get_velocity_at_altitude(h)
+        vc = np.sqrt(self.mu / (self.R + h))
+        deltaV = np.sqrt(vc**2 + v**2 - 2 * vc * v * np.cos(self.get_gamma_at_altitude(h)))
+        return deltaV
 
 
 class LaunchTrajectory(Orbit):
