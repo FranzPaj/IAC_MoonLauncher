@@ -34,8 +34,8 @@ def plot_2D_figure(
 
     # Create color bar
     cbar = fig.colorbar(cax, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label(colorbar_label, fontsize=14)
-    cbar.ax.tick_params(labelsize=12)
+    cbar.set_label(colorbar_label, fontsize=16)
+    cbar.ax.tick_params(labelsize=14)
 
     if contour:
         if extended:
@@ -46,21 +46,21 @@ def plot_2D_figure(
             ax.clabel(contours, inline=True, fontsize=8, fmt='%1.2f')
 
     # Create labels
-    ax.set_xlabel(xlabel, fontsize=14)
-    ax.set_ylabel(ylabel, fontsize=14)
+    ax.set_xlabel(xlabel, fontsize=16)
+    ax.set_ylabel(ylabel, fontsize=16)
 
     # Formatting
     x_labels = np.array(np.arange(10, 90, 10), dtype=int)
     x_ticks = np.searchsorted(initial_angles, np.radians(x_labels)) * 2
     plt.xticks(ticks=x_ticks,
                labels=x_labels,
-               fontsize=12)
+               fontsize=14)
 
     y_labels = np.arange(200, 2000, 200)
     y_ticks = np.searchsorted(initial_velocities, y_labels)
     plt.yticks(ticks=y_ticks,
                labels=y_labels,
-               fontsize=12)
+               fontsize=14)
 
     # Plot optimal path
     if plot_paths:
@@ -76,7 +76,7 @@ def plot_2D_figure(
             ax.plot(np.searchsorted(gamma, launch_params_maglev[:, 0]),
                     np.searchsorted(v0, launch_params_maglev[:, 1]),
                     color='tab:red', linestyle='--', label='Case 1 opt')
-        fig.legend(bbox_to_anchor=(0.3, 0.31), fontsize=12)
+        fig.legend(bbox_to_anchor=(0.3, 0.31), fontsize=14)
 
     ax.grid(True)
     fig.tight_layout()
@@ -96,6 +96,8 @@ if __name__ == '__main__':
     ### Maglev
     deltaV_maglev, launch_params_maglev = moon_launch_optim(return_params=True)
     maglev_ratio = np.exp(deltaV_maglev / (Isp * 9.81)) - 1
+    maglev_useful_mass = (900 - 100 * maglev_ratio) / (maglev_ratio + 1)
+    maglev_gear_ratio = 900 / maglev_useful_mass
 
     ### SpinLaunch
     gamma = np.radians(np.arange(0.5, 90, 0.5))
@@ -117,6 +119,9 @@ if __name__ == '__main__':
     mass_ratio = fill_nan_2d(mass_ratio)
     mass_ratio[mass_ratio <= minimum_ratio] = np.nan
 
+    useful_mass = (900 - 100 * mass_ratio) / (mass_ratio + 1)
+    gear_ratio = 900 / useful_mass
+
     min_prop = np.nanargmin(mass_ratio, axis=1)
     min_prop_ext = np.empty((min_prop.size * 2))
     min_prop_ext[::2] = min_prop
@@ -136,46 +141,46 @@ if __name__ == '__main__':
 
 
     # Plot spinLaunch
-    plot_2D_figure(mass_ratio, 'Mass ratio [-]', extended=True, plot_paths=True,
-                   save='spinLaunch_mass_ratio', contour=True)
+    plot_2D_figure(gear_ratio, 'Gear ratio [-]', extended=True, plot_paths=True,
+                   save='gear_ratio', contour=True)
 
     ### Optimum and minimum velocities and their corresponding ratios
-    mass_ratio_T = mass_ratio.T
-    first_non_nan_indices = np.full(mass_ratio_T.shape[1], np.nan)
+    gear_ratio_T = gear_ratio.T
+    first_non_nan_indices = np.full(gear_ratio_T.shape[1], np.nan)
 
     # Iterate over each column to find the first non-NaN value
     ratio_min_v = []
     min_v = []
-    for col in range(mass_ratio_T.shape[1]):
-        non_nan_indices = np.where(~np.isnan(mass_ratio_T[:, col]))[0]
+    for col in range(gear_ratio_T.shape[1]):
+        non_nan_indices = np.where(~np.isnan(gear_ratio_T[:, col]))[0]
         if non_nan_indices.size > 0:
             first_non_nan_indices[col] = int(non_nan_indices[0])
-            ratio_min_v.append(mass_ratio_T[int(non_nan_indices[0]), col])
+            ratio_min_v.append(gear_ratio_T[int(non_nan_indices[0]), col])
             min_v.append(v0[int(non_nan_indices[0])])
 
     ## Plot ratios
     fig, ax = plt.subplots(figsize=(12, 6))
 
     # Maglev params
-    ax.plot(np.degrees(launch_params_maglev[:, 0]), maglev_ratio,
+    ax.plot(np.degrees(launch_params_maglev[:, 0]), maglev_gear_ratio,
             label=r'Case 1 opt', color='tab:blue', linestyle='-')
 
     # SpinLaunch params
-    ax.plot(np.degrees(gamma), np.nanmin(mass_ratio, axis=1),
+    ax.plot(np.degrees(gamma), np.nanmin(gear_ratio, axis=1),
             label='Case 2 opt', color='tab:blue', linestyle='--')
 
     # Minimum params
     ax.plot(np.degrees(gamma), ratio_min_v, label='Minimum', color='tab:blue', linestyle=':')
 
     ax.set_xlabel('Launch angle [deg]', fontsize=14)
-    ax.set_ylabel('Mass ratio [-]', fontsize=14)
+    ax.set_ylabel('Gear ratio [-]', fontsize=14)
     ax.tick_params(axis='x', labelsize=12)
     ax.tick_params(axis='y', labelsize=12)
 
     ax.grid(True)
     ax.legend(bbox_to_anchor=(0.64, 0.945), fontsize=12)
 
-    # # plt.savefig('Plots\\Opt_and_min_ratios.pdf')
+    plt.savefig('Plots\\Opt_and_min_gear_ratios.pdf')
     plt.show()
 
     ## Plot velocities
