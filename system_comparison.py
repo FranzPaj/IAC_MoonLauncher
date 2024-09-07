@@ -1,5 +1,6 @@
 from OrbitalDynamics.launch_trajectories import moon_launch_optim
 from OrbitalDynamics.spinLaunch import fill_nan_2d, optimize_mass_ratio
+from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -100,12 +101,11 @@ if __name__ == '__main__':
     maglev_gear_ratio = 900 / maglev_useful_mass
 
     ### SpinLaunch
-    gamma = np.radians(np.arange(0.5, 90, 0.5))
+    gamma = np.concatenate((np.radians(np.arange(0.5, 30, 0.1)), np.radians(np.arange(30, 90, 0.5))))
     v0 = np.linspace(200, 2000, len(gamma) + 1)
 
     # Calculate ratio
     # spinLaunch_ratio_0, end_prop, circularization_prop, final_height, final_angle, final_velocity = optimize_mass_ratio(gamma, v0, Isp, mass_diagnostics=True)
-    # np.savetxt('filled_mass_ratio_v2.csv', spinLaunch_ratio_0, delimiter=',')
     # np.savetxt('end_prop_v2.csv', end_prop, delimiter=',')
     # np.savetxt('circularization_prop_v2.csv', circularization_prop, delimiter=',')
     # np.savetxt('final_height.csv', final_height, delimiter=',')
@@ -113,13 +113,14 @@ if __name__ == '__main__':
     # mass_ratio = spinLaunch_ratio_0
 
     # Load values and fill in NaNs
-    # mass_ratio = np.loadtxt('filled_mass_ratio_v2.csv', delimiter=',')
+    mass_ratio = np.loadtxt('filled_mass_ratio_v2.csv', delimiter=',')
 
-    mass_ratio = optimize_mass_ratio(gamma, v0, Isp, mass_diagnostics=False)
+    # mass_ratio = optimize_mass_ratio(gamma, v0, Isp, mass_diagnostics=False)
     minimum_ratio = np.nanmin(mass_ratio)
     mass_ratio[mass_ratio <= 0] = np.nan
     mass_ratio = fill_nan_2d(mass_ratio)
     mass_ratio[mass_ratio <= minimum_ratio] = np.nan
+    # np.savetxt('filled_mass_ratio_v2.csv', mass_ratio, delimiter=',')
 
     useful_mass = (900 - 100 * mass_ratio) / (mass_ratio + 1)
     gear_ratio = 900 / useful_mass
@@ -144,7 +145,7 @@ if __name__ == '__main__':
 
     # Plot spinLaunch
     plot_2D_figure(gear_ratio, 'Gear ratio [-]', extended=True, plot_paths=True,
-                   save='gear_ratio', contour=True)
+                   save='gear_ratio', contour=True, initial_angles=gamma, initial_velocities=v0)
 
     ### Optimum and minimum velocities and their corresponding ratios
     gear_ratio_T = gear_ratio.T
@@ -183,6 +184,23 @@ if __name__ == '__main__':
     ax.legend(bbox_to_anchor=(0.64, 0.945), fontsize=12)
 
     plt.savefig('Plots\\Opt_and_min_gear_ratios.pdf')
+    plt.show()
+
+    ### Propellant margin
+    margin = 100 / np.nanmin(gear_ratio, axis=1) - 100 / np.array(ratio_min_v)
+
+    # Fit a polynomial to the data
+    popt, _ = curve_fit(polynomial, np.degrees(gamma), margin, p0=[1, 1, 1, 1, 1, 1])
+    margin_fit = polynomial(np.degrees(gamma), *popt)
+
+    # Plot results
+    plt.scatter(np.degrees(gamma), margin, s=8)
+    plt.plot(np.degrees(gamma), margin_fit, color='red', linestyle='--', linewidth=2)
+    plt.xlabel('Launch angle [deg]', fontsize=16)
+    plt.ylabel('Propellant margin [%]', fontsize=16)
+    plt.tick_params(axis='both', which='major', labelsize=14)
+    plt.tight_layout()
+    plt.savefig('Plots\\propellant_margin_min_v.pdf')
     plt.show()
 
     ## Plot velocities
